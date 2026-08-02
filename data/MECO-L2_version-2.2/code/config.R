@@ -13,7 +13,7 @@ library(xtable)
 WAVE = 1 # Runs code on Wave 1 data
 # WAVE = 2 # Runs code on Wave 2 data
 
-WRITE_AUX_FILES = T
+WRITE_AUX_FILES = F
 
 dataset_dir <- paste0("./data/MECO-L2_version-2.2/", "wave-", WAVE, "/")
 
