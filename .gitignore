@@ -9,3 +9,5 @@
 .venv/
 output/
 networks/*/output/
+lib/
+settings.json
