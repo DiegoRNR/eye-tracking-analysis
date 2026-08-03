@@ -6,6 +6,10 @@
 .DS_Store
 
 *.csv
+*.rds
+
+plots/
+
 .venv/
 output/
 networks/*/output/
