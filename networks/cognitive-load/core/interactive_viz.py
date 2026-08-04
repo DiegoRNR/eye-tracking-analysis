@@ -21,24 +21,36 @@ from pyvis.network import Network
 
 def visualize_network_interactive(G, build_dir, prefix):
     """
-    Renderiza la red en plots/network_interactive.html con pyvis.
+    Renderiza la red en build_dir/network_interactive.html con pyvis.
 
-    - Color de nodo: viridis sobre `mean_ps`.
-    - Tamaño de nodo: proporcional a `fix_count`.
-    - Color de arista: coolwarm sobre `mean_dps`.
-    - Grosor de arista: proporcional a `count`.
-    - Tooltip HTML por nodo: word, wordnum, sentnum, fix_count, mean_ps, mean_ps_z, community.
-    - Tooltip HTML por arista: type, count, n_sessions, mean_dps.
-    - Layout forceAtlas2Based con botones de navegación y physics toggle.
+    Canales visuales (post-processados en la leyenda HTML):
+      - Color de nodo:  viridis sobre `mean_ps` (mapa perceptual uniforme).
+      - Tamaño de nodo: proporcional a `fix_count`.
+      - Color de arista: coolwarm sobre `mean_dps` (rojo = spike cognitivo).
+      - Grosor de arista: proporcional a `count`.
+
+    Tooltip por nodo: tarjeta (card) con layout grid 2-col (label : valor).
+    Tooltip por arista: misma tarjeta, con header `{word_u} → {word_v}`.
+
+    Extras:
+      - `filter_menu=True` (dropdown para filtrar por propiedad).
+      - `multiselect=True` para selección múltiple.
+      - Estabilización adaptativa: `min(300, max(100, n_nodes * 2))` iters.
+      - Highlight on select: al hacer click en un nodo, los nodos y aristas
+        no relacionados bajan a opacity 0.2 / 0.1; click en espacio vacío
+        (que dispara `deselectNode` por default) restaura los opacities.
     """
     os.makedirs(build_dir, exist_ok=True)
     out_path = os.path.join(build_dir, "network_interactive.html")
 
+    # --- node color: viridis on mean_ps ---
     ps_arr = np.array(
         [d.get("mean_ps", 0.0) for _, d in G.nodes(data=True)], dtype=float
     )
-    ps_min = float(ps_arr.min())
-    ps_max = float(ps_arr.max())
+    if ps_arr.size:
+        ps_min, ps_max = float(ps_arr.min()), float(ps_arr.max())
+    else:
+        ps_min, ps_max = 0.0, 1.0
     norm = mcolors.Normalize(
         vmin=ps_min, vmax=ps_max if ps_max > ps_min else ps_min + 1.0
     )
@@ -48,28 +60,101 @@ def visualize_network_interactive(G, build_dir, prefix):
         for n, d in G.nodes(data=True)
     }
 
+    # --- node size: fix_count (for legend min/max) ---
+    fix_arr = np.array(
+        [d.get("fix_count", 0) for _, d in G.nodes(data=True)], dtype=int
+    )
+    if fix_arr.size:
+        fix_min, fix_max = int(fix_arr.min()), int(fix_arr.max())
+    else:
+        fix_min, fix_max = 0, 1
+
+    # --- edge color: coolwarm on mean_dps ---
+    dps_arr = np.array(
+        [d.get("mean_dps", 0.0) for _, _, d in G.edges(data=True)], dtype=float
+    )
+    if dps_arr.size:
+        dmin, dmax = float(dps_arr.min()), float(dps_arr.max())
+        drange = dmax - dmin if dmax > dmin else 1.0
+    else:
+        dmin, dmax, drange = 0.0, 0.0, 1.0
+    coolwarm = matplotlib.colormaps["coolwarm"]
+
+    # --- edge thickness: count (for legend min/max) ---
+    count_arr = np.array(
+        [d.get("count", 0) for _, _, d in G.edges(data=True)], dtype=int
+    )
+    if count_arr.size:
+        count_min, count_max = int(count_arr.min()), int(count_arr.max())
+    else:
+        count_min, count_max = 0, 1
+
+    # --- stabilization iterations, adapted to graph size ---
+    n_stab = min(300, max(100, G.number_of_nodes() * 2))
+
     net = Network(
         height="800px",
         width="100%",
         directed=True,
         notebook=False,
-        heading=f"Red de Carga Cognitiva — {prefix}",
+        heading="",  # empty: el template de pyvis 0.3.2 lo duplica; el título
+        # se inyecta por post-processing para que aparezca una sola vez.
         cdn_resources="remote",
+        filter_menu=True,
     )
-    # Workaround for pyvis 0.3.2: prep_notebook loads the template; despite the
-    # name, it's the right call for HTML output too. The constructor only
-    # calls it when notebook=True, leaving self.template=None otherwise.
+    # Workaround para pyvis 0.3.2: prep_notebook carga el template; pese al
+    # nombre, también es la llamada correcta para salida HTML. El constructor
+    # sólo lo invoca cuando notebook=True, dejando self.template=None en
+    # caso contrario.
     net.prep_notebook()
+
+    # --- node tooltip template (card layout) ---
+    node_card_css = (
+        "background:#ffffff;"
+        "border:1px solid #d0d0d0;"
+        "border-radius:6px;"
+        "padding:10px 12px;"
+        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
+        "font-size:13px;"
+        "min-width:180px;"
+        "box-shadow:0 2px 4px rgba(0,0,0,0.1);"
+    )
+    node_card_header_css = (
+        "font-weight:600;"
+        "font-size:14px;"
+        "border-bottom:1px solid #eee;"
+        "padding-bottom:4px;"
+        "margin-bottom:6px;"
+        "color:#2c3e50;"
+    )
+    node_card_grid_css = (
+        "display:grid;"
+        "grid-template-columns:auto 1fr;"
+        "gap:3px 14px;"
+        "align-items:baseline;"
+    )
+    node_card_label_css = "color:#888;"
 
     for n, d in G.nodes(data=True):
         word = d.get("word", str(n))
         title = (
-            f"<b>{word}</b><br>"
-            f"wordnum={d.get('wordnum', 0)}, sentnum={d.get('sentnum', 1)}<br>"
-            f"fix_count={d.get('fix_count', 0)}<br>"
-            f"mean_ps={d.get('mean_ps', 0.0):.2f}<br>"
-            f"mean_ps_z={d.get('mean_ps_z', 0.0):.3f}<br>"
-            f"community={d.get('community_label', 'n/a')}"
+            f'<div style="{node_card_css}">'
+            f'<div style="{node_card_header_css}">Metrics</div>'
+            f'<div style="{node_card_grid_css}">'
+            f'<span style="{node_card_label_css}">wordnum</span>'
+            f'<span>{d.get("wordnum", 0)}</span>'
+            f'<span style="{node_card_label_css}">sentnum</span>'
+            f'<span>{d.get("sentnum", 1)}</span>'
+            f'<span style="{node_card_label_css}">fix_count</span>'
+            f'<span>{d.get("fix_count", 0)}</span>'
+            f'<span style="{node_card_label_css}">mean_ps</span>'
+            f'<span>{d.get("mean_ps", 0.0):.2f}</span>'
+            f'<span style="{node_card_label_css}">mean_ps_z</span>'
+            f'<span>{d.get("mean_ps_z", 0.0):.3f}</span>'
+            f'<span style="{node_card_label_css}">community</span>'
+            f'<span>{d.get("community_label", "n/a")}</span>'
+            f'</div>'
+            f'</div>'
         )
         net.add_node(
             n,
@@ -79,22 +164,22 @@ def visualize_network_interactive(G, build_dir, prefix):
             value=max(1.0, float(d.get("fix_count", 1))),
         )
 
-    dps_arr = np.array(
-        [d.get("mean_dps", 0.0) for _, _, d in G.edges(data=True)], dtype=float
-    )
-    if dps_arr.size:
-        dmin = float(dps_arr.min())
-        dmax = float(dps_arr.max())
-        drange = dmax - dmin if dmax > dmin else 1.0
-    else:
-        dmin, dmax, drange = 0.0, 0.0, 1.0
-    coolwarm = matplotlib.colormaps["coolwarm"]
+    # --- edge tooltip template (card layout) ---
     for u, v, d in G.edges(data=True):
+        word_u = G.nodes[u].get("word", u)
+        word_v = G.nodes[v].get("word", v)
         title = (
-            f"{u} → {v}<br>"
-            f"type={d.get('type', 'forward')}<br>"
-            f"count={d.get('count', 0)} (sessions={d.get('n_sessions', 0)})<br>"
-            f"mean_dps={d.get('mean_dps', 0.0):.2f}"
+            f'<div style="{node_card_css}">'
+            f'<div style="{node_card_header_css}">{word_u} → {word_v}</div>'
+            f'<div style="{node_card_grid_css}">'
+            f'<span style="{node_card_label_css}">type</span>'
+            f'<span>{d.get("type", "forward")}</span>'
+            f'<span style="{node_card_label_css}">count</span>'
+            f'<span>{d.get("count", 0)} (sessions={d.get("n_sessions", 0)})</span>'
+            f'<span style="{node_card_label_css}">mean_dps</span>'
+            f'<span>{d.get("mean_dps", 0.0):.2f}</span>'
+            f'</div>'
+            f'</div>'
         )
         t = (d.get("mean_dps", 0.0) - dmin) / drange
         net.add_edge(
@@ -106,24 +191,161 @@ def visualize_network_interactive(G, build_dir, prefix):
         )
 
     net.set_options(
-        """
-        var options = {
-          "nodes": {"font": {"size": 14}},
-          "edges": {
-            "smooth": {"enabled": true, "type": "dynamic"},
-            "arrows": {"to": {"enabled": true}}
-          },
-          "physics": {
+        f"""
+        var options = {{
+          "nodes": {{"font": {{"size": 14}}}},
+          "edges": {{
+            "smooth": {{"enabled": true, "type": "dynamic"}},
+            "arrows": {{"to": {{"enabled": true}}}}
+          }},
+          "physics": {{
             "enabled": true,
             "solver": "forceAtlas2Based",
-            "forceAtlas2Based": {"gravitationalConstant": -50, "springLength": 100},
-            "stabilization": {"iterations": 200}
-          },
-          "interaction": {"hover": true, "tooltipDelay": 100, "navigationButtons": true}
-        }
+            "forceAtlas2Based": {{"gravitationalConstant": -50, "springLength": 100}},
+            "stabilization": {{"iterations": {n_stab}}}
+          }},
+          "interaction": {{
+            "hover": true,
+            "tooltipDelay": 50,
+            "navigationButtons": true,
+            "multiselect": true
+          }}
+        }}
         """
     )
 
     net.show(out_path)
+
+    # --- post-process: single title + complete legend + selection highlight ---
+    title_html = (
+        f'<h1 style="font-family: sans-serif; text-align: center; '
+        f'margin: 16px 0 8px;">Red de Carga Cognitiva — {prefix}</h1>'
+    )
+
+    legend_style = (
+        "position: fixed;"
+        "top: 50%;"
+        "right: 20px;"
+        "transform: translateY(-50%);"
+        "z-index: 9999;"
+        "background: white;"
+        "padding: 15px;"
+        "border-radius: 8px;"
+        "box-shadow: 0 4px 6px rgba(0,0,0,0.3);"
+        "font-family: sans-serif;"
+        "font-size: 13px;"
+        "width: 240px;"
+        "user-select: none;"
+        "-webkit-user-select: none;"
+        "-moz-user-select: none;"
+    )
+    legend_html = f"""
+    <div style="{legend_style}">
+        <h3 style="margin-top: 0; text-align: center; font-size: 15px;">Legend</h3>
+
+        <div style="margin-bottom: 12px;">
+            <strong>Node Color (Mean PS)</strong>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>{ps_min:.2f}</span><span>{ps_max:.2f}</span>
+            </div>
+            <div style="height: 12px; background: linear-gradient(to right,
+                #440154, #31688e, #35b779, #fde725); border-radius: 3px;
+                border: 1px solid #ccc;"></div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <strong>Node Size (fix_count)</strong>
+            <div style="display: flex; align-items: center; justify-content: space-between;
+                        height: 36px;">
+                <span style="font-size: 11px;">{fix_min}</span>
+                <div style="display: flex; align-items: center; gap: 16px;">
+                    <div style="width: 8px; height: 8px; border-radius: 50%;
+                                background: #555;"></div>
+                    <div style="width: 16px; height: 16px; border-radius: 50%;
+                                background: #555;"></div>
+                    <div style="width: 28px; height: 28px; border-radius: 50%;
+                                background: #555;"></div>
+                </div>
+                <span style="font-size: 11px;">{fix_max}</span>
+            </div>
+        </div>
+
+        <div style="margin-bottom: 12px;">
+            <strong>Edge Color (Mean DPS)</strong>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>{dmin:.2f}</span><span>{dmax:.2f}</span>
+            </div>
+            <div style="height: 12px; background: linear-gradient(to right,
+                #3b4cc0, #dddddd, #b40426); border-radius: 3px;
+                border: 1px solid #ccc;"></div>
+        </div>
+
+        <div>
+            <strong>Edge Thickness (count)</strong>
+            <div style="display: flex; flex-direction: column; align-items: center;
+                        gap: 4px; padding: 6px 0;">
+                <div style="height: 1px; width: 60px; background: #555;"></div>
+                <div style="height: 3px; width: 60px; background: #555;"></div>
+                <div style="height: 6px; width: 60px; background: #555;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                <span>{count_min}</span><span>{count_max}</span>
+            </div>
+        </div>
+    </div>
+    """
+
+    highlight_script = """
+    <script>
+    (function() {
+        function setHighlight(selectedIds) {
+            if (!selectedIds || selectedIds.length === 0) {
+                var resetNodes = nodes.get().map(function(n) { n.opacity = 1.0; return n; });
+                var resetEdges = edges.get().map(function(e) { e.opacity = 1.0; return e; });
+                nodes.update(resetNodes);
+                edges.update(resetEdges);
+                return;
+            }
+            var connectedNodeIds = new Set();
+            var connectedEdgeIds = new Set();
+            selectedIds.forEach(function(id) {
+                connectedNodeIds.add(id);
+                network.getConnectedNodes(id).forEach(function(c) {
+                    connectedNodeIds.add(c);
+                });
+                network.getConnectedEdges(id).forEach(function(e) {
+                    connectedEdgeIds.add(e);
+                });
+            });
+            var updatedNodes = nodes.get().map(function(n) {
+                n.opacity = connectedNodeIds.has(n.id) ? 1.0 : 0.2;
+                return n;
+            });
+            var updatedEdges = edges.get().map(function(e) {
+                e.opacity = connectedEdgeIds.has(e.id) ? 1.0 : 0.1;
+                return e;
+            });
+            nodes.update(updatedNodes);
+            edges.update(updatedEdges);
+        }
+        network.on("selectNode", function(params) { setHighlight(params.nodes); });
+        network.on("deselectNode", function(params) { setHighlight([]); });
+    })();
+    </script>
+    """
+
+    with open(out_path, "r", encoding="utf-8") as f:
+        html_content = f.read()
+
+    css_override = "<style>#loadingBar { display: none !important; }</style>"
+    html_content = html_content.replace("<body>", f"<body>\n{css_override}", 1)
+    html_content = html_content.replace("<body>", f"<body>\n{title_html}", 1)
+    html_content = html_content.replace(
+        "</body>", f"{legend_html}\n{highlight_script}\n</body>", 1
+    )
+
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
     print(f"[OK] Visualización interactiva (pyvis) guardada en: {out_path}")
     return out_path
