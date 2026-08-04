@@ -1,47 +1,50 @@
 # Dataset MECO L2
 
+> **Nota de especificación:** Las definiciones campo por campo de los
+> reportes popEye que MECO L2 reutiliza están en
+> [`POPEYE_DATA_SPEC.md`](POPEYE_DATA_SPEC.md). El README lista los
+> campos disponibles en cada archivo y enlaza a la spec para su
+> semántica detallada (unidades, ojo dominante, fórmulas de agregación).
+
 ## Descripción
+
+Datos del *Multilingual Eye-movements Corpus*, componente L2 (Kuperman et al., 2023, DOI: 10.1017S0272263121000954; Kuperman et al., 2025, DOI: 10.1017/S0272263125000105), en su versión 2.2. El corpus contiene registros de eye-tracking durante lectura en 12 textos en inglés como L2, más tareas de comprensión lectora, medidas de diferencias individuales y datos demográficos. Se distribuye en dos waves independientes.
 
 ## Datos
 
-### Variables Base
-
-- `trialid`: Número de texto (y número de prueba en el experimento).
-- `sentnum`: Número del pasaje en el texto.
-- `ianum`: Número de la palabra en el texto.
-- `ia`: Palabra en el formato presentado al lector.
-- `ia_clean`: Palabra convertida a minúsculas y sin signos de puntuación.
-- `freq`: Frecuencia de la palabra en el *fasttext corpus*.
-- `zipf_freq`: Frecuencia de la palabra en el *fasttext corpus*, normalizado en escala logarítimica con valores de 1 a 6 (o 7 si se consideran palabras funcionales)
-- `length`: Total de caracteres de AOI. 
+Los archivos se organizan bajo `MECO-L2_version-2.2/wave-{1,2}/` y `benchmark/`. Cada subsección debajo documenta un archivo (o set de archivos) con sus campos.
 
 ### Textos
 
-A continuación se listan los textos utilizados en la captura de datos, ordenados según su `trialid` en el dataset.
+Wave 1 - Archivo asociado: `data/benchmark/texts.meco.l2.rda`
+Wave 2 - Archivo asociado: `data/benchmark/texts.meco.l2.rda`
 
-1. Samuel Morse
-2. Leonardo Da Vinci
-3. Amazon Rainforest
-4. Multiple Intelligences
-5. Internet Risks
-6. Good Night's Sleep
-7. Bird's Feathers
-8. Animal Hibernation
-9. Leeches as Medical Cure
-10. Music File Sharing
-11. Pencil
-12. Technology
+- `trialid`: Número de texto (y número de prueba en el experimento) [1, 12].
+- `text`: Texto completo presentado al lector.
+- `question1`: Primera pregunta de comprensión lectora para el texto.
+- `question2`: Segunda pregunta de comprensión lectora para el texto.
 
-Cada texto tiene asociadas dos preguntas de comprensión lectora sobre el contenido del mismo.
+### Características de palabras
+
+Wave 1 - Archivo asociado: `data/benchmark/L2 word length and frequency.rda`
+Wave 2 - Archivo asociado: `data/benchmark/L2 word length and frequency.rda`
+
+- `trialid`: Número de texto [1, 12].
+- `sentnum`: Número de la oración dentro del texto.
+- `ianum`: Número de la palabra dentro del texto.
+- `ia`: Palabra en el formato presentado al lector.
+- `ia_clean`: Palabra convertida a minúsculas y sin signos de puntuación.
+- `freq`: Frecuencia de la palabra en el *fasttext corpus*.
+- `zipf_freq`: Frecuencia en escala logarítmica de Zipf [1, 6] (o 7 si se
+  consideran palabras funcionales), sobre el *fasttext corpus*.
+- `length`: Total de caracteres de la palabra.
 
 ### Comprensión Lectora
 
-Corresponden a datos acerca de la precisión de las respuestas a las preguntas presentadas a los participantes tras la lectura de cada texto.
-
 #### Número de Respuestas Correctas por Participante
 
-Wave 1 - Archivo asociado: `joint.comp.l2.rda`
-Wave 2 - Archivo asociado: `joint_comp_L2_Wave2_trimmed.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/comprehension/joint.comp.l2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/comprehension/joint_comp_L2_Wave2_trimmed.rda`
 
 - `subject`: Identificador de participante (ej. DU_04).
 - `uniform_id`: Identificador de participante normalizado (ej. du_4).
@@ -52,8 +55,8 @@ Wave 2 - Archivo asociado: `joint_comp_L2_Wave2_trimmed.rda`
 
 #### Número de Respuestas Correctas por Participante en cada Texto
 
-Wave 1 - Archivo asociado: `joint_l2_acc_breakdown.rda`
-Wave 2 - Archivo asociado: `joint_l2_Wave2_acc_breakdown_trimmed.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/comprehension/joint_l2_acc_breakdown.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/comprehension/joint_l2_Wave2_acc_breakdown_trimmed.rda`
 
 - `subject`: Identificador de participante (ej. DU_04).
 - `uniform_id`: Identificador de participante normalizado (ej. du_4).
@@ -63,8 +66,8 @@ Wave 2 - Archivo asociado: `joint_l2_Wave2_acc_breakdown_trimmed.rda`
 
 #### Número de Respuestas Correctas por Participante en cada Pregunta
 
-Wave 1 - Archivo asociado: `joint_l2_acc_full_breakdown.rda`
-Wave 2 - Archivo asociado: `joint_l2_wave2_acc_full_breakdown_trimmed.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/comprehension/joint_l2_acc_full_breakdown.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/comprehension/joint_l2_wave2_acc_full_breakdown_trimmed.rda`
 
 - `subject`: Identificador de participante (ej. DU_04).
 - `uniform_id`: Identificador de participante normalizado (ej. du_4).
@@ -77,208 +80,181 @@ Wave 2 - Archivo asociado: `joint_l2_wave2_acc_full_breakdown_trimmed.rda`
 
 #### Medidas por Palabra
 
-Wave 1 - Archivo asociado: `joint_data_l2_trimmed_version2.2.rda`
-Wave 2 - Archivo asociado: `joint_data_l2_trimmed_version2.2.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/eye-tracking/joint_data_l2_trimmed_version2.2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/eye-tracking/joint_data_trimmed_L2_wave2_version2.2.rda`
 
-- `subid`: Identificador de participante (ej. DU_04).
-- `uniform_id`: Identificador de participante normalizado (ej. du_4).
 - `lang`: Código de lengua primaria del participante (ej. du).
-- `trial`: A. ***Wave 1***
-- `trialid`: Número de texto [1, 12].
-- `trialnum`: A.
-- `itemid`: A.
-- `cond`: A.
-- `supplementary_id`: A. ***Wave 2***
-- `sentnum`: A.
-- `wordnum`: A.
-- `word`: A.
-- `blink`: A.
-- `skip`: A.
-- `nrun`: A.
-- `reread`: A.
-- `nfix`: A.
-- `refix`: A.
-- `reg.in`: A.
-- `reg.out`: A.
-- `dur`: A.
-- `firstrun.skip`: A.
-- `firstrun.nfix`: A.
-- `firstrun.refix`: A.
-- `firstrun.reg.in`: A.
-- `firstrun.reg.out`: A.
-- `firstrun.dur`: A.
-- `firstrun.gopast`: A.
-- `firstrun.gopast.sel`: A.
-- `firstfix.sac.in`: A.
-- `firstfix.sac.out`: A.
-- `firstfix.launch`: A.
-- `firstfix.land`: A.
-- `firstfix.cland`: A.
-- `firstfix.dur`: A.
-- `singlefix`: A.
-- `singlefix.sac.in`: A.
-- `singlefix.sac.out`: A.
-- `singlefix.launch`: A.
-- `singlefix.land`: A.
-- `singlefix.cland`: A.
-- `singlefix.dur`: A.
+- `trial`: Nombre abreviado del trial — presente sólo en wave 1.
+- `supplementary_id`: Identificador suplementario — presente sólo en wave 2.
+- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+
+***Campos popEye***
+
+- `subid`, `trialid`, `trialnum`, `itemid`, `cond`, `sentnum`, `wordnum`, `word`, `blink`, `skip`, `nrun`, `reread`, `nfix`, `refix`, `reg.in`, `reg.out`, `dur`, `firstrun.skip`, `firstrun.nfix`, `firstrun.refix`, `firstrun.reg.in`, `firstrun.reg.out`, `firstrun.dur`, `firstrun.gopast`, `firstrun.gopast.sel`, `firstfix.sac.in`, `firstfix.sac.out`, `firstfix.launch`, `firstfix.land`, `firstfix.cland`, `firstfix.dur`, `singlefix`, `singlefix.sac.in`, `singlefix.sac.out`, `singlefix.launch`, `singlefix.land`, `singlefix.cland`, `singlefix.dur`
+
+Definición de cada campo: ver [Reporte de Palabra / Área de Interés](POPEYE_DATA_SPEC.md#reporte-de-palabra-area-de-interes-word--interest-area-report).
 
 #### Palabras por Minuto para cada Pasaje por Participante
 
-Wave 1 - Archivo asociado: `joint.l2.readrate_version2.2.rda`
-Wave 2 - Archivo asociado: `joint_readrate_L2_wave2_version2.2.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/eye-tracking/joint.l2.readrate_version2.2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/eye-tracking/joint_readrate_L2_wave2_version2.2.rda`
 
 - `uniform_id`: Identificador de participante normalizado (ej. du_4).
 - `lang`: Código de lengua primaria del participante (ej. du).
 - `trialid`: Número de texto [1, 12].
 - `rate`: Número de palabras leídas por minuto.
 
-#### Medidas por Oración (10 caracteres)
+#### Medidas por Oración
 
-Wave 1 - Archivo asociado: `joint.l2.readrate_sent_version2.2.rda`
-Wave 2 - Archivo asociado: `joint.l2.readrate_sent_version2.2.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/eye-tracking/joint.l2.readrate_sent_version2.2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/eye-tracking/joint_sent_trimmed_L2_wave2_version2.2.rda`
 
-- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+> Wave 1 sólo incluye el subset de *readrate por oración*. <br>
+> Wave 2 incluye el reporte de oración completo.
+
 - `lang`: Código de lengua primaria del participante (ej. du).
-- `trialid`: Número de texto [1, 12].
-- `trialnum`: A. ***Wave 2***
-- `itemid`: A. ***Wave 2***
-- `cond`: A. ***Wave 2***
-- `supplementary_id`: A. ***Wave 2***
-- `sentnum`: A.
-- `sent`: A.
-- `sent.nwords`: A.
-- `skip`: A.
-- `nrun`: A.
-- `reread`: A.
-- `reg.in`: A.
-- `reg.out`: A.
-- `total.nfix`: A.
-- `total.dur`: A.
-- `rate`: Número de palabras leídas por minuto.
-- `gopast`: A.
-- `gopast.sel`: A.
-- `firstrun.skip`: A.
-- `firstrun.reg.in`: A.
-- `firstrun.reg.out`: A.
-- `firstpass.nfix`: A.
-- `firstpass.dur`: A.
-- `firstpass.forward.nfix`: A.
-- `firstpass.forward.dur`: A.
-- `firstpass.reread.nfix`: A.
-- `firstpass.reread.dur`: A.
-- `lookback.nfix`: A.
-- `lookback.dur`: A.
-- `lookfrom.nfix`: A.
-- `lookfrom.dur`: A.
+- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+- `supplementary_id`: Identificador suplementario — presente sólo en wave 2.
+
+***Campos popEye***
+
+- `subid` (sólo wave 2), `trialid`, `trialnum`, `itemid` (sólo wave 2), `cond` (sólo wave 2), `sentnum`, `sent`, `sent.nwords`, `skip`, `nrun`, `reread`, `reg.in`, `reg.out`, `total.nfix`, `total.dur`, `rate`, `gopast`, `gopast.sel`, `firstrun.skip`, `firstrun.reg.in`, `firstrun.reg.out`, `firstpass.nfix`, `firstpass.dur`, `firstpass.forward.nfix`, `firstpass.forward.dur`, `firstpass.reread.nfix`, `firstpass.reread.dur`, `lookback.nfix`, `lookback.dur`, `lookfrom.nfix`, `lookfrom.dur`
+
+Definición de cada campo: ver [Reporte de Oración](POPEYE_DATA_SPEC.md#reporte-de-oracion-sentence-report).
 
 #### Medidas por Sacada
 
-Wave 1 - Archivo asociado: `joint_L2_sac_trimmed_wave1_2.2.rda`
-Wave 2 - Archivo asociado: `joint_sac_trimmed_L2_wave2_version2.2.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/eye-tracking/joint_sac_trimmed_wave1_2.2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/eye-tracking/joint_sac_trimmed_L2_wave2_version2.2.rda`
 
-- `subid`: Identificador de participante (ej. DU_4).
-- `uniform_id`: Identificador de participante normalizado (ej. du_4).
 - `lang`: Código de lengua primaria del participante (ej. du).
-- `trialid`: Número de texto [1, 12].
-- `trialnum`: A.
-- `msg`: Tipo de evento {SAC; BLINK}
-- `itemid`: A.
-- `cond`: A.
-- `trial`: A. ***Wave 2***
-- `supplementary_id`: A. ***Wave 2***
+- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+- `msg`: Tipo de evento `{SAC, BLINK}`.
 - `sacid`: Identificador de evento de sacada para cada texto por participante.
-- ***Campos de posición, distancia, tiempo, etc.***
+- `trial`: Nombre abreviado del trial — presente sólo en wave 2.
+- `supplementary_id`: Identificador suplementario — presente sólo en wave 2.
+
+***Campos popEye***
+
+- `subid`, `trialid`, `trialnum`, `itemid`, `cond`, `start`, `stop`, `dur`, `xs`, `ys`, `xe`, `ye`, `xsn`, `ysn`, `xen`, `yen`, `dist.let`
+
+Definición de cada campo: ver [Reporte de Sacada](POPEYE_DATA_SPEC.md#reporte-de-sacada-saccade-report).
+
+> **Extensiones MECO L2 (no en `Measures.md` canónico de popEye):** el
+> archivo incluye además `lines`, `linee`, `dist.line`, `lets`, `lete`,
+> `dx`, `dy`, `dist.px`, `amp.px`, `amp.deg`, `pv.px`, `pv.deg`. Son
+> campos adicionales del reporte de sacada de MECO L2 y no están
+> documentados como campos popEye estándar.
 
 #### Medidas por Fijación
 
-Wave 1 - Archivo asociado: `joint_l2_fixation_trimmed_report_2.2.rda`
-Wave 2 - Archivo asociado: `joint_fix_trimmed_L2_wave2_version2.2.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/eye-tracking/joint_l2_fixation_trimmed_report_2.2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/eye-tracking/joint_fix_trimmed_L2_wave2_version2.2.rda`
 
-- `subid`: Identificador de participante (ej. DU_4).
-- `uniform_id`: Identificador de participante normalizado (ej. du_4).
 - `lang`: Código de lengua primaria del participante (ej. du).
-- `trialid`: Número de texto [1, 12].
-- `trialnum`: A.
-- `itemid`: A.
-- `cond`: A.
-- `fixid`: Identificador de evento de sacada para cada texto por participante.
-- `word`: A.
-- ``: A.
-- ***Campos de posición, distancia, tiempo, etc.***
+- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+- `fixid`: Identificador de evento de fijación para cada texto por participante.
+- `trial`: Nombre abreviado del trial — presente sólo en wave 1.
+- `trial.nwords`: Número de palabras del trial — presente sólo en wave 1.
+
+***Campos popEye***
+
+- `subid`, `trialid`, `trialnum`, `itemid`, `cond`, `start`, `stop`, `xs`, `ys`, `xn`, `yn`, `ym`, `dur`, `ps`, `sac.in`, `sac.out`, `type`, `blink`, `line`, `line.change`, `line.let`, `line.word`, `letternum`, `letter`, `wordnum`, `word`, `ianum`, `ia`, `sentnum`, `sent`, `sent.nwords`, `word.fix`, `word.run`, `word.runid`, `word.run.fix`, `word.firstskip`, `word.refix`, `word.launch`, `word.land`, `word.cland`, `word.reg.out`, `word.reg.in`, `word.reg.out.to`, `word.reg.in.from`, `ia.fix`, `ia.run`, `ia.runid`, `ia.run.fix`, `ia.firstskip`, `ia.refix`, `ia.launch`, `ia.land`, `ia.cland`, `ia.reg.out`, `ia.reg.in`, `ia.reg.out.to`, `ia.reg.in.from`, `sent.word`, `sent.fix`, `sent.run`, `sent.runid`, `sent.run.fix`, `sent.firstskip`, `sent.refix`, `sent.reg.out`, `sent.reg.in`, `sent.reg.out.to`, `sent.reg.in.from`
+
+Definición de cada campo (incluyendo `ps`): ver [Reporte de Fijación](POPEYE_DATA_SPEC.md#reporte-de-fijacion-fixation-report).
 
 #### Medidas por Pasaje
 
-Wave 1 - Archivo asociado: ***NA**
-Wave 2 - Archivo asociado: `joint_passage_trimmed_L2_wave2_version2.2.rda`
+Wave 1 - Archivo asociado: ***NA***
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/eye-tracking/joint_passage_trimmed_L2_wave2_version2.2.rda`
 
-- `subid`: Identificador de participante (ej. DU_04).
-- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+> El reporte de Pasaje **no aparece** en la documentación estándar de
+> popEye (`materials/Measures.md`); es una agregación a nivel de
+> passage (texto completo) introducida por MECO L2. Los campos representan 
+> totales/promedios sobre todas las palabras y oraciones del texto.
+
+- `subid`, `trialid`, `trialnum`, `itemid`, `cond`, `trial`, `trial.nwords`, `nblink`, `nrun`, `nfix`, `nout`, `sac`, `skip`, `refix`, `reg`, `mfix`, `firstpass`, `rereading`, `total`, `rate`
 - `lang`: Código de lengua primaria del participante (ej. du).
-- `trialid`: Número de texto [1, 12].
-- `trialnum`: A.
-- `itemid`: A.
-- `cond`: A.
-- `trial`: A.
-- `trial.nwords`: A.
-- `supplementary_id`: A.
-- `nblink`: A.
-- `nrun`: A.
-- `nfix`: A.
-- `nout`: A.
-- `nsac`: A.
-- `skip`: A.
-- `refix`: A.
-- `reg`: A.
-- `mfix`: A.
-- `firstpass`: A.
-- `rereading`: A.
-- `total`: A.
-- `rate`: A.
+- `uniform_id`: Identificador de participante normalizado (ej. du_4).
+- `supplementary_id`: Identificador suplementario — presente sólo en wave 2.
 
 ### Diferencias Individuales
 
 #### Puntaje Obtenido por Tarea
 
-Wave 1 - Archivo asociado: `joint.ind.diff.l2.rda`
-Wave 2 - Archivo asociado: `joint.ind.diff.l2.w2.rda`
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/individual-differences/joint.ind.diff.l2.rda`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/individual-differences/joint.ind.diff.l2.w2.rda`
 
-- `subid`: Identificador de participante (ej. DU_04). ***Wave 1***
+- `subid`: Identificador de participante (ej. DU_04) — presente sólo en wave 1.
 - `uniform_id`: Identificador de participante normalizado (ej. du_4).
 - `lang`: Código de lengua primaria del participante (ej. du).
-- `spelling`: a.
-- `motiv`: a.
-- `lextale`: a.
-- `TOWRE_word`: a.
-- `TOWRE_nonword`: a.
-- `vocab`: a.
-- `vocab.t2.5`: a.
-- `cft20`: a.
+- `spelling`: Puntaje en tarea de deletreo.
+- `motiv`: Puntaje en cuestionario de motivación.
+- `lextale`: Puntaje en tarea LexTALE de vocabulario.
+- `TOWRE_word`: Puntaje TOWRE — palabras reales.
+- `TOWRE_nonword`: Puntaje TOWRE — pseudopalabras.
+- `vocab`: Puntaje en tarea de vocabulario.
+- `vocab.t2.5`: Puntaje de vocabulario con topes en percentiles 2.5 y 97.5.
+- `cft20`: Puntaje en *Culture Fair Intelligence Test* (20 ítems).
 
 #### LEAP-Q
 
-Directorio con archivos `*.xlsx` con información demográfica y proficiencia en lengua primaria e inglés como lengua secundaria de los participantes.
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/primary-data/individual-differences/leap-q/*.xlsx`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/primary-data/individual-differences/leap-q/*.xlsx`
 
-## Estadísticas Descriptivas
+Directorio con archivos `*.xlsx` con información demográfica y
+proficiencia en lengua primaria e inglés como lengua secundaria de los
+participantes (cuestionario LEAP-Q).
 
-### Aspectos Evaluados
+### Estadísticas Descriptivas
 
-- Precisión de la Comprensión
-- Medidas de Seguimiento Ocular
-- Tasa de Lectura
-- Diferencias Individuales
+Archivos auxiliares generados por el código de MECO L2 (publicados como
+suplemento del paper). Resumen, por lengua y/o texto, las variables
+dependientes de cada sección.
 
-### Campos Medidos
+#### Comprensión por Pasaje
 
-- var: Código identificador de aspecto evaluado.
-- lang: Código de lengua primaria de los participantes.
-- trialid: Índice identificador de texto evaluado.  
-- n: Total de participantes en la evaluación.
-- mean: Valor del promedio de valores obtenidos en la evaluación.
-- sd: Valor de la desviación estándar obtenida en la evaluación.
-- se: Valor del error estándar obtenido en la evaluación.
-- median: Valor de la mediana obtenida en la evaluación.
-- min: Valor mínimo obtenido en la evaluación.
-- max: Valor máximo obtenido en la evaluación.
-- q1: Valor del primer cuartil obtenido en la evaluación.
-- q3: Valor del tercer cuartil obtenido en la evaluación.
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/auxiliary-files/descriptive_acc_passage.csv`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/auxiliary-files/descriptive_acc_passage.csv`
+
+- `var`: Código identificador de la variable de precisión (`acc`).
+- `lang`: Código de lengua primaria de los participantes.
+- `trialid`: Índice identificador de texto evaluado [1, 12].
+- `n`: Total de participantes en la evaluación.
+- `mean`: Valor promedio de respuestas correctas.
+- `sd`: Desviación estándar.
+- `se`: Error estándar.
+- `median`: Mediana.
+- `min`: Valor mínimo.
+- `max`: Valor máximo.
+- `q1`: Primer cuartil.
+- `q3`: Tercer cuartil.
+
+#### Eye-tracking por Lengua
+
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/auxiliary-files/descriptive_eyemove_language.csv`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/auxiliary-files/descriptive_eyemove_language.csv`
+
+- `var`: Código identificador de la medida de eye-tracking (ej. `dur`, `nfix`).
+- `lang`: Código de lengua primaria de los participantes.
+- `n`: Total de participantes en la evaluación.
+- `mean`, `sd`, `se`, `median`, `min`, `max`: Estadísticos resumen sobre la variable.
+
+#### Tasa de Lectura por Pasaje
+
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/auxiliary-files/descriptive_rate_passage.csv`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/auxiliary-files/descriptive_rate_passage.csv`
+
+- `var`: Código identificador de la variable de tasa (`rate`).
+- `lang`: Código de lengua primaria de los participantes.
+- `trialid`: Índice identificador de texto evaluado [1, 12].
+- `n`, `mean`, `sd`, `se`, `median`, `min`, `max`, `q1`, `q3`: Estadísticos resumen sobre la variable.
+
+#### Diferencias Individuales por Lengua
+
+Wave 1 - Archivo asociado: `MECO-L2_version-2.2/wave-1/auxiliary-files/descriptive_ind_language.csv`
+Wave 2 - Archivo asociado: `MECO-L2_version-2.2/wave-2/auxiliary-files/descriptive_ind_language.csv`
+
+- `var`: Código identificador de la prueba (ej. `cft`, `lextale`, `TOWRE_*`).
+- `lang`: Código de lengua primaria de los participantes.
+- `n`, `mean`, `sd`, `se`, `median`, `min`, `max`: Estadísticos resumen sobre la variable.
