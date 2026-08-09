@@ -23,7 +23,7 @@ familia** + el **accuracy global por participante** adjunto a cada build.
 
 ## Estado
 
-**En implementación.** Sigue el esquema canónico definido en
+**Implementada.** Sigue el esquema canónico definido en
 [`networks/README.md`](../README.md) usando `cognitive-load/` como referencia.
 
 ---
@@ -33,12 +33,13 @@ familia** + el **accuracy global por participante** adjunto a cada build.
 ```
 networks/language-comparison/
 ├── README.md                 # Este archivo
-├── langcomp.py               # Entry point CLI: subcomandos `build` y `stats`
+├── langcomp.py               # Entry point CLI: subcomandos `build`, `stats`, `compare`
 ├── core/
 │   ├── __init__.py           # Re-exporta SOLO la API pública
 │   ├── language_groups.py    # Mapeo de códigos L1 → familia lingüística
 │   ├── data_io.py            # Carga de fijaciones por grupo + accuracy global
 │   ├── network_builder.py    # Construcción de la red (reusa cognitive-load)
+│   ├── comparison.py         # Comparación multi-familia + reporte HTML
 │   ├── paths.py              # Rutas a CSVs de fijación y comprensión
 │   ├── persistence.py        # Serialización + metadata.json con accuracy
 │   ├── visualization.py      # Plots base (matplotlib/seaborn)
@@ -212,6 +213,62 @@ python -c "import json,glob; [print(f'{m[\"lang_group\"]}: {m[\"accuracy\"][\"me
 
 Para comparar qué palabras reciben más atención por familia, se cargan los
 `nodes.csv` de cada build y se cruzan por `wordnum`/`word`.
+
+---
+
+## Comparación automática: subcomando `compare`
+
+Construye (o reutiliza) una red por familia y genera un **reporte HTML
+comparativo** con tabla resumen, plots y una pestaña por familia.
+
+```bash
+# Todas las familias presentes en el wave
+python networks/language-comparison/langcomp.py compare --trialid 4 --wave 1
+
+# Solo familias específicas
+python networks/language-comparison/langcomp.py compare --trialid 4 --wave 2 --families germanic romance slavic
+
+# Forzar reconstrucción de todo (ignora builds existentes)
+python networks/language-comparison/langcomp.py compare --trialid 4 --wave 1 --no-reuse
+```
+
+### Flags de `compare`
+
+| Flag | Descripción | Default |
+|------|-------------|---------|
+| `--trialid <1-12>` | ID del texto a analizar. | `1` |
+| `--wave {1,2,both}` | Ola(s) a cargar. | `1` |
+| `--families <f1> <f2> ...` | Familias a comparar (espacios). | todas las presentes en el wave |
+| `--normalize {zscore,none}` | Normalización de `ps`. | `zscore` |
+| `--outdir <ruta>` | Carpeta raíz de salida. | `networks/language-comparison/output` |
+| `--no-reuse` | Reconstruye todas las familias (ignora builds existentes). | — |
+| `--no-interactive` | Omite el HTML interactivo de cada familia. | — |
+
+> **Nota:** las familias sin lenguas en el wave se omiten automáticamente
+> (p.ej. `sino-tibetan`, `indo-aryan`, `isolate` no existen en wave 1).
+
+### Salida
+
+```
+output/comparison_trial4_w1/
+├── comparison_report.html      # Tabla + plots + pestañas por familia (red interactiva + métricas)
+├── comparison_summary.csv      # accuracy + métricas por familia
+└── plots/
+    ├── comparison_accuracy.png     # Barras de accuracy.mean por familia
+    └── comparison_attention.png    # Líneas mean_ps_z por wordnum (una por familia)
+```
+
+> Abrir `comparison_report.html` desde su carpeta (`output/comparison_trial4_w1/`)
+> para que los iframes relativos a cada `network_interactive.html` carguen.
+
+### Comportamiento
+
+1. Reutiliza el build de cada familia si ya existe y el caché está fresco
+   (`check_cache_fresh`); si no, lo construye (misma lógica que `build`).
+2. Si un build reutilizado no tiene `network_interactive.html` (se construyó
+   con `--no-interactive`), se regenera desde su `graph.pkl`.
+3. Recolecta accuracy + métricas por familia en `comparison_summary.csv` y el
+   HTML.
 
 ---
 

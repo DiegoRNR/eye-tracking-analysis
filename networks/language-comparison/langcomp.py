@@ -36,6 +36,7 @@ from core import (
     load_fixations_by_group,
     normalize_session_ps,
     resolve_group,
+    run_comparison,
     save_built_network,
     summarize_accuracy,
     visualize_group_network,
@@ -98,40 +99,41 @@ def _add_stats_args(parser):
     )
 
 
-def _run_build_pipeline(args, do_interactive=True):
+def _build_single_group(
+    group, trialid, wave, normalize, outdir, do_interactive=True
+):
     """
     Carga fijaciones del grupo, carga accuracy, construye la red, la persiste
     y genera los plots base. Retorna la ruta del build_dir, o None si no se
     encontraron fijaciones.
     """
-    group = args.lang_group
     try:
-        resolve_group(group, args.wave)
+        resolve_group(group, wave)
     except ValueError as e:
         print(f"[ERROR] {e}")
         return None
 
     fixations, source_files, langs = load_fixations_by_group(
-        wave=args.wave,
+        wave=wave,
         group=group,
-        trialid=args.trialid,
+        trialid=trialid,
     )
     if not fixations:
         print("[!] No se encontraron fijaciones con los criterios especificados.")
         return None
 
-    if args.normalize == "zscore":
+    if normalize == "zscore":
         fixations = normalize_session_ps(fixations)
         for f in fixations:
             f["has_z"] = True
-    elif args.normalize == "none":
+    elif normalize == "none":
         for f in fixations:
             f["ps_z"] = 0.0
             f["has_z"] = False
     else:
-        raise ValueError(f"normalize debe ser 'zscore' o 'none', got {args.normalize!r}")
+        raise ValueError(f"normalize debe ser 'zscore' o 'none', got {normalize!r}")
 
-    acc_map, comp_files = load_accuracy(args.wave, set(langs))
+    acc_map, comp_files = load_accuracy(wave, set(langs))
     accuracy_summary, n_participants, n_with_accuracy = summarize_accuracy(
         acc_map, fixations
     )
@@ -145,7 +147,7 @@ def _run_build_pipeline(args, do_interactive=True):
         print("[!] No se pudo calcular accuracy: ningún participante con datos de comprensión.")
 
     text_label = (
-        f"Language-Comparison_{group}_Trial_{args.trialid}"
+        f"Language-Comparison_{group}_Trial_{trialid}"
     )
 
     G = build_group_network(
@@ -154,31 +156,31 @@ def _run_build_pipeline(args, do_interactive=True):
         text_label=text_label,
     )
 
-    ps_absent = langs_without_ps(args.wave)
+    ps_absent = langs_without_ps(wave)
     prefix = build_prefix(
         lang_group=group,
-        trialid=args.trialid,
-        wave=args.wave,
-        normalize=args.normalize,
+        trialid=trialid,
+        wave=wave,
+        normalize=normalize,
         group_langs=langs,
-        ps_absent_langs=[l for l in ps_absent if l in resolve_group(group, args.wave)],
+        ps_absent_langs=[l for l in ps_absent if l in resolve_group(group, wave)],
     )
 
     all_source = list(source_files) + list(comp_files)
     build_dir = save_built_network(
         G,
-        output_dir=args.outdir,
+        output_dir=outdir,
         prefix=prefix,
         source_files=all_source,
         groupby="all",
-        wave=args.wave,
-        trialid=args.trialid,
+        wave=wave,
+        trialid=trialid,
         lang_group=group,
         languages=langs,
         accuracy_summary=accuracy_summary,
         n_participants=n_participants,
         n_with_accuracy=n_with_accuracy,
-        normalize=args.normalize,
+        normalize=normalize,
     )
 
     visualize_group_network(G, build_dir, prefix)
@@ -192,6 +194,18 @@ def _run_build_pipeline(args, do_interactive=True):
             print("    Instalar con: pip install pyvis")
 
     return build_dir
+
+
+def _run_build_pipeline(args, do_interactive=True):
+    """Wrapper de _build_single_group a partir de argparse args."""
+    return _build_single_group(
+        group=args.lang_group,
+        trialid=args.trialid,
+        wave=args.wave,
+        normalize=args.normalize,
+        outdir=args.outdir,
+        do_interactive=do_interactive,
+    )
 
 
 def build_command(args):
@@ -232,6 +246,23 @@ def stats_command(args):
     return 0
 
 
+def compare_command(args):
+    comp_dir = run_comparison(
+        trialid=args.trialid,
+        wave=args.wave,
+        families=args.families,
+        normalize=args.normalize,
+        outdir=args.outdir,
+        reuse_cache=not args.no_reuse,
+        do_interactive=not args.no_interactive,
+    )
+    if comp_dir is None:
+        return 0
+    print(f"\n[ÉXITO] Comparación generada en: {comp_dir}")
+    print(f"    Abrir: {os.path.join(comp_dir, 'comparison_report.html')}")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="langcomp",
@@ -257,11 +288,62 @@ def main(argv=None):
     _add_shared_args(stats_p)
     _add_stats_args(stats_p)
 
+    compare_p = subparsers.add_parser(
+        "compare",
+        help="Comparar familias: una red por familia + reporte HTML.",
+    )
+    compare_p.add_argument(
+        "--trialid",
+        type=str,
+        default="1",
+        help="ID de texto [1-12] (por defecto: 1).",
+    )
+    compare_p.add_argument(
+        "--wave",
+        type=str,
+        default="1",
+        choices=["1", "2", "both"],
+        help="Ola(s) a cargar: 1, 2 o 'both'.",
+    )
+    compare_p.add_argument(
+        "--families",
+        type=str,
+        nargs="*",
+        default=None,
+        help="Familias a comparar (separadas por espacios; default: todas). "
+             f"Disponibles: {', '.join(ALL_FAMILIES)}.",
+    )
+    compare_p.add_argument(
+        "--normalize",
+        type=str,
+        default="zscore",
+        choices=["zscore", "none"],
+        help="Normalización de PS por sesión.",
+    )
+    compare_p.add_argument(
+        "--outdir",
+        type=str,
+        default=os.path.join("networks", "language-comparison", "output"),
+        help="Carpeta raíz de salida.",
+    )
+    compare_p.add_argument(
+        "--no-reuse",
+        action="store_true",
+        help="Reconstruye todas las familias (ignora builds existentes).",
+    )
+    compare_p.add_argument(
+        "--no-interactive",
+        action="store_true",
+        help="Omite la generación del HTML interactivo de cada familia.",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "build":
         return build_command(args)
     if args.command == "stats":
         return stats_command(args)
+    if args.command == "compare":
+        return compare_command(args)
     parser.error(f"Subcomando desconocido: {args.command}")
     return 2
 

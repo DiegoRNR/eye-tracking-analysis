@@ -31,6 +31,7 @@ from .persistence import (
 )
 from .visualization import visualize_group_network
 from .interactive_viz import visualize_group_network_interactive
+from .comparison import run_comparison
 from .stats import group_stats_from_cache
 
 __all__ = [
@@ -61,6 +62,8 @@ __all__ = [
     # visualization
     "visualize_group_network",
     "visualize_group_network_interactive",
+    # comparison
+    "run_comparison",
     # stats
     "group_stats_from_cache",
 ]

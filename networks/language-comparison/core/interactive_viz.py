@@ -85,49 +85,26 @@ def visualize_group_network_interactive(G, build_dir, prefix):
     )
     net.prep_notebook()
 
-    node_card_css = (
+    tooltip_css = (
         "background:#ffffff;"
         "border:1px solid #d0d0d0;"
         "border-radius:6px;"
-        "padding:10px 12px;"
+        "padding:8px 12px;"
         "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
         "font-size:13px;"
-        "min-width:180px;"
+        "color:#2c3e50;"
+        "white-space:nowrap;"
         "box-shadow:0 2px 4px rgba(0,0,0,0.1);"
     )
-    node_card_header_css = (
-        "font-weight:600;"
-        "font-size:14px;"
-        "border-bottom:1px solid #eee;"
-        "padding-bottom:4px;"
-        "margin-bottom:6px;"
-        "color:#2c3e50;"
-    )
-    node_card_grid_css = (
-        "display:grid;"
-        "grid-template-columns:auto 1fr;"
-        "gap:3px 14px;"
-        "align-items:baseline;"
-    )
-    node_card_label_css = "color:#888;"
 
     for n, d in G.nodes(data=True):
         word = d.get("word", str(n))
         title = (
-            f'<div style="{node_card_css}">'
-            f'<div style="{node_card_header_css}">Metrics</div>'
-            f'<div style="{node_card_grid_css}">'
-            f'<span style="{node_card_label_css}">wordnum</span>'
-            f'<span>{d.get("wordnum", 0)}</span>'
-            f'<span style="{node_card_label_css}">sentnum</span>'
-            f'<span>{d.get("sentnum", 1)}</span>'
-            f'<span style="{node_card_label_css}">fix_count</span>'
-            f'<span>{d.get("fix_count", 0)}</span>'
-            f'<span style="{node_card_label_css}">mean_ps</span>'
-            f'<span>{d.get("mean_ps", 0.0):.2f}</span>'
-            f'<span style="{node_card_label_css}">mean_ps_z</span>'
-            f'<span>{d.get("mean_ps_z", 0.0):.3f}</span>'
-            f'</div>'
+            f'<div style="{tooltip_css}">'
+            f'<b>{word}</b> · wordnum {d.get("wordnum", 0)} · '
+            f'fix_count {d.get("fix_count", 0)} · '
+            f'mean_ps {d.get("mean_ps", 0.0):.2f} · '
+            f'mean_ps_z {d.get("mean_ps_z", 0.0):.3f}'
             f'</div>'
         )
         net.add_node(
@@ -142,16 +119,10 @@ def visualize_group_network_interactive(G, build_dir, prefix):
         word_u = G.nodes[u].get("word", u)
         word_v = G.nodes[v].get("word", v)
         title = (
-            f'<div style="{node_card_css}">'
-            f'<div style="{node_card_header_css}">{word_u} → {word_v}</div>'
-            f'<div style="{node_card_grid_css}">'
-            f'<span style="{node_card_label_css}">type</span>'
-            f'<span>{d.get("type", "forward")}</span>'
-            f'<span style="{node_card_label_css}">count</span>'
-            f'<span>{d.get("count", 0)} (sessions={d.get("n_sessions", 0)})</span>'
-            f'<span style="{node_card_label_css}">mean_dps</span>'
-            f'<span>{d.get("mean_dps", 0.0):.2f}</span>'
-            f'</div>'
+            f'<div style="{tooltip_css}">'
+            f'<b>{word_u} → {word_v}</b> · {d.get("type", "forward")} · '
+            f'count {d.get("count", 0)} (sessions={d.get("n_sessions", 0)}) · '
+            f'mean_dps {d.get("mean_dps", 0.0):.2f}'
             f'</div>'
         )
         t = (d.get("mean_dps", 0.0) - dmin) / drange

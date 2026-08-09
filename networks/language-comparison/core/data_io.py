@@ -122,6 +122,13 @@ def load_fixations_by_group(wave, group, trialid=None):
     ps_absent = set(langs_without_ps(wave))
     usable_langs = [l for l in langs if l not in ps_absent]
 
+    if not usable_langs:
+        print(
+            f"[!] Grupo '{group}' no tiene lenguas con datos de pupila en "
+            f"wave {wave}; no se cargan fijaciones."
+        )
+        return [], fix_paths, []
+
     all_fix = []
     for p in fix_paths:
         w = wave_of_path(p)
