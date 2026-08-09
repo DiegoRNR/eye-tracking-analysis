@@ -85,27 +85,13 @@ def visualize_group_network_interactive(G, build_dir, prefix):
     )
     net.prep_notebook()
 
-    tooltip_css = (
-        "background:#ffffff;"
-        "border:1px solid #d0d0d0;"
-        "border-radius:6px;"
-        "padding:8px 12px;"
-        "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;"
-        "font-size:13px;"
-        "color:#2c3e50;"
-        "white-space:nowrap;"
-        "box-shadow:0 2px 4px rgba(0,0,0,0.1);"
-    )
-
     for n, d in G.nodes(data=True):
         word = d.get("word", str(n))
         title = (
-            f'<div style="{tooltip_css}">'
-            f'<b>{word}</b> · wordnum {d.get("wordnum", 0)} · '
-            f'fix_count {d.get("fix_count", 0)} · '
-            f'mean_ps {d.get("mean_ps", 0.0):.2f} · '
-            f'mean_ps_z {d.get("mean_ps_z", 0.0):.3f}'
-            f'</div>'
+            f"{word} · wordnum {d.get('wordnum', 0)} · "
+            f"fix_count {d.get('fix_count', 0)} · "
+            f"mean_ps {d.get('mean_ps', 0.0):.2f} · "
+            f"mean_ps_z {d.get('mean_ps_z', 0.0):.3f}"
         )
         net.add_node(
             n,
@@ -119,11 +105,9 @@ def visualize_group_network_interactive(G, build_dir, prefix):
         word_u = G.nodes[u].get("word", u)
         word_v = G.nodes[v].get("word", v)
         title = (
-            f'<div style="{tooltip_css}">'
-            f'<b>{word_u} → {word_v}</b> · {d.get("type", "forward")} · '
-            f'count {d.get("count", 0)} (sessions={d.get("n_sessions", 0)}) · '
-            f'mean_dps {d.get("mean_dps", 0.0):.2f}'
-            f'</div>'
+            f"{word_u} → {word_v} · {d.get('type', 'forward')} · "
+            f"count {d.get('count', 0)} (sessions={d.get('n_sessions', 0)}) · "
+            f"mean_dps {d.get('mean_dps', 0.0):.2f}"
         )
         t = (d.get("mean_dps", 0.0) - dmin) / drange
         net.add_edge(
