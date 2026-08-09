@@ -19,12 +19,116 @@ familia** + el **accuracy global por participante** adjunto a cada build.
 - **Metadatos de familia:** `lang_group`, `languages` (códigos L1 del grupo),
   `n_participants`, y bloque `accuracy` (mean, median, std, min, max, n).
 
+### Qué hace esta implementación
+
+La implementación expone **tres subcomandos** que cubren el pipeline completo:
+
+| Subcomando | Qué hace | Salida |
+|------------|----------|--------|
+| `build` | Construye y persiste la red de **una familia** para un `trialid`+`wave`. | `output/langcomp_trial<...>_<familia>/` |
+| `stats` | Calcula métricas, cascadas y modularidad sobre un build ya generado (cache). | `stats/` dentro del build |
+| `compare` | Construye (o reutiliza) una red **por familia** y genera un reporte HTML comparativo. | `output/comparison_trial<...>_w<...>/` |
+
+**Nota técnica sobre el reuso de código:** la construcción de la red reutiliza
+`build_cogload_network` de `networks/cognitive-load` vía `importlib`, cargando su
+paquete `core` bajo el alias `cogload_core`. Esto es necesario porque **ambos
+paquetes se llaman `core`** y un import directo colisionaría. Ver
+`core/network_builder.py`.
+
 ---
 
 ## Estado
 
 **Implementada.** Sigue el esquema canónico definido en
 [`networks/README.md`](../README.md) usando `cognitive-load/` como referencia.
+
+---
+
+## Requisitos y setup
+
+- **Python ≥ 3.11** (pinned en `.python-version`). Gestor de paquetes: `uv`.
+- **R** en el PATH, **únicamente** para la conversión RDA → CSV (una sola vez).
+- Dependencias Python en `pyproject.toml` (`networkx`, `pandas`, `numpy`,
+  `scipy`, `matplotlib`, `seaborn`, `pyvis`).
+
+```bash
+# 1. Crear el entorno e instalar dependencias
+uv sync
+.venv\Scripts\activate        # Windows  (Linux/Mac: source .venv/bin/activate)
+
+# 2. PRERREQUISITO CRÍTICO: materializar los CSVs desde los RDA
+#    (los archivos *.csv y *.rds están gitignored; sin ellos no corre nada)
+Rscript scripts/convert_rda_to_csv.R
+```
+
+R solo se necesita para el paso 2. Una vez que los CSVs existen bajo `data/`,
+todo el trabajo es Python.
+
+---
+
+## Cómo ejecutar
+
+Flujo recomendado (desde la raíz del repositorio):
+
+```bash
+# 1. Construir la red de una familia
+python networks/language-comparison/langcomp.py build --lang-group germanic --trialid 4 --wave 1
+
+# 2. Calcular estadísticas sobre ese build (cache; no reconstruye)
+python networks/language-comparison/langcomp.py stats \
+  --load networks/language-comparison/output/langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no
+
+# 3. Comparar todas las familias presentes en el wave (reporte HTML)
+python networks/language-comparison/langcomp.py compare --trialid 4 --wave 1
+
+# 4. Abrir el reporte comparativo en el navegador
+start networks/language-comparison/output/comparison_trial4_w1/comparison_report.html
+```
+
+> **Importante:** abrir `comparison_report.html` **desde su carpeta**
+> (`output/comparison_trial4_w1/`) para que los iframes relativos a cada
+> `network_interactive.html` de las familias carguen correctamente.
+
+### Flags de `build` y `stats`
+
+| Flag | Descripción | Default |
+|------|-------------|---------|
+| `--lang-group <grupo>` | Familia lingüística o `all`. | `germanic` |
+| `--trialid <1-12>` | ID del texto a analizar. | `1` |
+| `--wave {1,2,both}` | Ola(s) a cargar. | `1` |
+| `--normalize {zscore,none}` | Normalización de `ps` por sesión. | `zscore` |
+| `--outdir <ruta>` | Carpeta raíz de salida. | `networks/language-comparison/output` |
+| `--no-interactive` | Omite la generación de `network_interactive.html` (build). | — |
+
+> `stats` admite además `--load <build_dir>` (modo cache) y los umbrales
+> `--cascade-window`, `--z-thresh`, `--p-thresh`, `--name`.
+
+### Familias lingüísticas disponibles
+
+| Familia | Códigos L1 | Waves |
+|---------|------------|-------|
+| `germanic` | du, en, ge, no, da, en_uk, ge_po, ge_zu, ic, se | 1, 2 |
+| `romance` | it, sp, bp, sp_ch | 1, 2 |
+| `slavic` | ru, ru_mo | 1, 2 |
+| `uralic` | ee, fi | 1 |
+| `turkic` | tr | 1, 2 |
+| `hellenic` | gr | 1 |
+| `semitic` | he | 1 |
+| `sino-tibetan` | ch_s, ch_t | 2 |
+| `indo-aryan` | hi_iiith, hi_iitk | 2 |
+| `isolate` | ba (euskera) | 2 |
+
+Las familias sin lenguas en una wave se **omiten automáticamente** en `compare`
+(p.ej. `uralic`, `hellenic`, `semitic` no existen en wave 2).
+
+### Formato del prefijo de build
+
+`langcomp_trial<T>_w<W>_<normalize>[_nops-<langs sin ps>]_<grupo>[_langs-<códigos>]`
+
+Ejemplos:
+
+- `langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no`
+- `langcomp_trial4_w2_zscore_nops-ch_s_sino-tibetan_langs-ch_t`
 
 ---
 
@@ -113,47 +217,9 @@ networks/language-comparison/
 
 ---
 
-## Cómo ejecutar
-
-Desde la raíz del repositorio:
-
-```bash
-# Construir la red de una familia para un trial y wave específicos
-python networks/language-comparison/langcomp.py build --lang-group germanic --trialid 4 --wave 1
-
-# Calcular estadísticas sobre un build (caché; no reconstruye)
-python networks/language-comparison/langcomp.py stats \
-  --load networks/language-comparison/output/langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no
-
-# Omitir el HTML interactivo (builds más rápidos)
-python networks/language-comparison/langcomp.py build --lang-group romance --trialid 2 --wave 1 --no-interactive
-```
-
-### Flags disponibles
-
-| Flag | Descripción | Default |
-|------|-------------|---------|
-| `--lang-group <grupo>` | Familia lingüística (`germanic`, `romance`, `slavic`, `uralic`, `turkic`, `hellenic`, `semitic`, `sino-tibetan`, `indo-aryan`, `isolate`, `all`). | `germanic` |
-| `--trialid <1-12>` | ID del texto a analizar. | `1` |
-| `--wave {1,2,both}` | Ola(s) a cargar. | `1` |
-| `--normalize {zscore,none}` | Normalización de `ps` por sesión. | `zscore` |
-| `--outdir <ruta>` | Carpeta de salida. | `networks/language-comparison/output` |
-| `--no-interactive` | Omite la generación de `network_interactive.html` (build). | — |
-
-Los flags compartidos siguen el esquema de `_add_shared_args()` de `cognitive-load`.
-
-### Formato del prefijo de build
-
-`langcomp_trial<T>_w<W>_<normalize>[_nops-<langs sin ps>]_<grupo>[_langs-<códigos>]`
-
-Ejemplos:
-
-- `langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no`
-- `langcomp_trial4_w2_zscore_nops-ch_s_sino-tibetan_langs-ch_t`
-
----
-
 ## Formato de `output/<build>/`
+
+Tras `build`, la carpeta del build contiene:
 
 | Archivo | Descripción |
 |---------|-------------|
@@ -190,29 +256,6 @@ Ejemplos:
 ```
 
 `output/` está en `.gitignore` (`networks/*/output/`).
-
----
-
-## Cómo comparar familias
-
-Cada build guarda su `accuracy` y métricas en `metadata.json`. Para comparar
-familias sobre el mismo trial/wave, se construyen los builds de las familias
-de interés y se leen sus `metadata.json`:
-
-```bash
-python networks/language-comparison/langcomp.py build --lang-group germanic --trialid 4 --wave 1
-python networks/language-comparison/langcomp.py build --lang-group romance --trialid 4 --wave 1
-python networks/language-comparison/langcomp.py build --lang-group slavic  --trialid 4 --wave 1
-```
-
-Luego, para ver el accuracy de cada familia:
-
-```bash
-python -c "import json,glob; [print(f'{m[\"lang_group\"]}: {m[\"accuracy\"][\"mean\"]} (n={m[\"accuracy\"][\"n\"]})') for m in (json.load(open(p)) for p in glob.glob('networks/language-comparison/output/langcomp_trial4_w1_*/*/metadata.json'))]"
-```
-
-Para comparar qué palabras reciben más atención por familia, se cargan los
-`nodes.csv` de cada build y se cruzan por `wordnum`/`word`.
 
 ---
 
@@ -272,6 +315,142 @@ output/comparison_trial4_w1/
 
 ---
 
+## Cómo interpretar los resultados
+
+### 1. La red interactiva (`network_interactive.html`)
+
+Es la representación visual de **cómo se mueve la carga cognitiva por las
+palabras** del texto, para la familia seleccionada:
+
+| Elemento | Qué codifica | Cómo leerlo |
+|----------|--------------|-------------|
+| **Nodo = palabra** | Color = `mean_ps` (pupila promedio; viridis: oscuro = poco, amarillo = mucho) | Palabras amarillas = más esfuerzo cognitivo |
+| **Tamaño de nodo** | `fix_count` (cuántas veces se fijaron los ojos en esa palabra) | Más grande = más fijaciones = más atención |
+| **Arista = transición** | Color = `mean_dps` (Δpupila entre palabras consecutivas; coolwarm: azul = suave, rojo = pico) | Aristas rojas = saltos bruscos de pupila entre 2 palabras = puntos de alta carga |
+| **Grosor de arista** | `count` (cuántas sesiones apoyan esa transición) | Más grueso = transición consistente entre muchos lectores |
+
+**Patrones a buscar:**
+
+- **Nodos amarillos + aristas rojas cerca**: palabra de alta dificultad que
+  dispara carga en las siguientes.
+- **Atención concentrada al inicio** del texto (ej. nombres propios) suele
+  indicar aclimatación al pasaje.
+- Pasa el cursor sobre un nodo para ver su tooltip (texto plano): `word ·
+  wordnum · fix_count · mean_ps · mean_ps_z`. Sobre una arista: `word_u → word_v
+  · type · count · mean_dps`.
+
+> ⚠️ Solo comparar `mean_ps_z` entre familias/waves. El `mean_ps` crudo **no es
+> comparable entre waves** (rango distinto).
+
+### 2. `metadata.json` — el accuracy de la familia
+
+Responde **"¿qué familia comprende mejor?"**:
+
+```json
+"accuracy": { "mean": 0.7672, "median": 0.7917, "std": 0.xx, "n": 109 }
+```
+
+- `accuracy.mean` = comprensión promedio de la familia (0–1). **Métrica principal.**
+- `accuracy.median` = robusto a extremos; si difiere mucho del mean, hay asimetría.
+- `accuracy.n` = **cuidado**: puede ser menor que `n_participants` (daneses W2 sin accuracy).
+
+**Ejemplo real (trial 4, wave 1):**
+
+| Familia | accuracy | n |
+|---------|----------|---|
+| uralic | **0.767** | 109 |
+| slavic | 0.747 | 47 |
+| semitic | 0.744 | 45 |
+| romance | 0.734 | 92 |
+| germanic | 0.720 | 176 |
+| turkic | 0.637 | 25 |
+| hellenic | **0.582** | 48 |
+
+**Patrón a investigar**: ¿por qué `uralic` (finés/estonio) comprende mejor que
+`hellenic` (griego)? El finés ni siquiera es indoeuropeo → apunta a factores de
+**exposición al inglés / sistema educativo**, no parentesco lingüístico. Eso es
+una hipótesis interesante.
+
+### 3. `stats/global_metrics.csv` — salud de la red
+
+| Métrica | Qué significa | Cómo leerla |
+|---------|---------------|-------------|
+| `n_nodes` / `n_edges` | Tamaño de la red | Igual número de nodos (142) = todos leyeron el mismo texto; la **densidad** varía |
+| `density` | Conexión relativa entre palabras | Más baja (w2 romance 0.0057) = transiciones repartidas entre más palabras |
+| `mean_dps` | Δpupila promedio entre palabras | Mismo texto, `mean_dps` alto = saltos pupilares más bruscos = más esfuerzo/inestabilidad |
+| `max_dps` | Mayor Δpupila en una arista | Un valor muy alto = al menos una palabra dispara un pico enorme |
+| `modularity` | Qué tan modular es la red | Alto (0.78–0.87 en w2) = el texto se agrupa en "zonas" de esfuerzo delimitadas |
+| `n_ps_peaks` | Palabras que son picos de carga | Más picos (30 vs 15) = más zonas de alta demanda |
+
+### 4. `stats/node_metrics.csv` — atención palabra por palabra
+
+Es **la fuente de oro** para "¿en qué palabras clave se fija más cada familia?".
+
+Columnas clave: `word`, `wordnum`, `fix_count`, `mean_ps`, `mean_ps_z`,
+`strength_in/out`, `community_label`.
+
+- **Palabras más atendidas**: ordenar por `mean_ps_z` desc. Los nombres propios
+  y términos del texto dominan (contenido semántico denso).
+- **`strength_out` alto** = palabra desde la que se dispara mucha carga hacia
+  adelante (palabra "gatillo").
+- **`strength_in` alto** = palabra hacia la que se acumula carga (palabra
+  "sumidero", donde el lector vuelve).
+
+**Patrón diferencial a buscar**: la **misma palabra** puede tener `mean_ps_z`
+alto en una familia y bajo en otra → indica **qué palabra es difícil para quién**.
+Cruzando los `node_metrics.csv` de varias familias por `word`, se ven las palabras
+con mayor divergencia de atención.
+
+### 5. `stats/cascades.csv` — propagación de carga
+
+Cada fila es un **pico de pupila** detectado en una sesión individual:
+
+| Campo | Significado |
+|-------|-------------|
+| `peak_wordnum` | Palabra donde está el pico |
+| `is_cascade` | `True` = el pico se **propaga** a las 4 palabras siguientes (test t significativo) |
+| `window_mean_signal` | Nivel medio de carga tras el pico |
+| `baseline_mean_signal` | Línea base previa |
+| `p_value` | Significancia de la cascada |
+
+**Cómo leerlo**: filtra `is_cascade=True` y agrupa por `peak_wordnum` → **¿en qué
+palabras del texto se disparan cascadas en cada familia?** Si una palabra dispara
+cascadas en `turkic`/`hellenic` pero no en `germanic`, es candidata a "palabra
+difícil para ese grupo".
+
+### 6. `stats/community_summary.csv` — zonas de esfuerzo
+
+Las comunidades agrupan palabras en zonas de carga: `high_stress` (alta pupila),
+`low_stress` (baja), `neutral`. El plot `community_along_text.png` lo visualiza
+a lo largo de `wordnum`.
+
+**Patrón a buscar**: comunidades `high_stress` **contiguas** en el texto (misma
+región de wordnums) = zonas particularmente exigentes para ese grupo. Si la
+franja `high_stress` cubre las mismas oraciones en una familia pero no en otra,
+es un hallazgo.
+
+### 7. Plots comparativos (`comparison_trial4_wX/`)
+
+- **`comparison_accuracy.png`**: barras de comprensión por familia → **la
+  respuesta visual a "quién comprende mejor"**.
+- **`comparison_attention.png`**: líneas `mean_ps_z` por palabra, una por
+  familia → **dónde divergen las familias en atención**.
+
+**Patrón clave del de atención**: busca zonas del texto donde las líneas se
+separan mucho (una familia en +1σ mientras otra está en −0.5σ). Esas son las
+palabras que **discriminan** entre grupos.
+
+### Flujo de análisis recomendado
+
+1. **Global primero**: `comparison_accuracy.png` → ordena familias por comprensión.
+2. **Red por familia**: `network_interactive.html` → mira dónde están los nodos amarillos/picos.
+3. **Por nodo**: `node_metrics.csv` → identifica las palabras que concentran atención en cada familia.
+4. **Diferencial**: cruza `node_metrics.csv` entre familias → palabras con mayor divergencia de `mean_ps_z`.
+5. **Cascadas**: `cascades.csv` filtrando `is_cascade=True` → qué palabras disparan propagación en cada grupo.
+6. **Modularidad**: `community_summary.csv` + `community_along_text.png` → qué regiones del texto son zonas de esfuerzo por familia.
+
+---
+
 ## Convenciones y restricciones
 
 Esta red hereda las convenciones obligatorias del esquema común (entry point
@@ -283,6 +462,14 @@ Restricciones adicionales específicas:
 - **No** comparar `mean_ps` crudo entre waves (rango distinto); usar z-score.
 - **No** asumir que `ps` nunca viene como `NA` — filtrar strings no numéricos.
 - **No** atribuir `accuracy` a participantes con `uniform_id = 'NA'`.
+
+**Nota metodológica — waves separadas (Opción A):** Wave 1 y Wave 2 son
+**cohortes independientes de participantes**. Solo `no` y `tr` aparecen en ambas,
+pero son personas distintas. Además el rango de `ps` difiere entre waves
+(139–7743 vs 166–3924), por lo que el `mean_ps` crudo no es comparable. Por eso
+la implementación genera **reportes separados por wave** (`comparison_trial4_w1/`
+y `comparison_trial4_w2/`), y **no** mezcla waves en una sola red. La comparación
+entre familias es válida **dentro de cada wave** usando z-scores.
 
 ---
 
