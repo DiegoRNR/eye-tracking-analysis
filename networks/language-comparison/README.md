@@ -122,20 +122,33 @@ python networks/language-comparison/langcomp.py build --lang-group germanic --tr
 
 # Calcular estadísticas sobre un build (caché; no reconstruye)
 python networks/language-comparison/langcomp.py stats \
-  --load networks/language-comparison/output/langcomp_trial4_w1_germanic
+  --load networks/language-comparison/output/langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no
+
+# Omitir el HTML interactivo (builds más rápidos)
+python networks/language-comparison/langcomp.py build --lang-group romance --trialid 2 --wave 1 --no-interactive
 ```
 
 ### Flags disponibles
 
 | Flag | Descripción | Default |
 |------|-------------|---------|
-| `--lang-group <grupo>` | Familia lingüística (`germanic`, `romance`, `slavic`, `uralic`, `turkic`, `hellenic`, `semitic`, `sino-tibetan`, `indo-aryan`, `isolate`, `all`). | requerido |
+| `--lang-group <grupo>` | Familia lingüística (`germanic`, `romance`, `slavic`, `uralic`, `turkic`, `hellenic`, `semitic`, `sino-tibetan`, `indo-aryan`, `isolate`, `all`). | `germanic` |
 | `--trialid <1-12>` | ID del texto a analizar. | `1` |
-| `--wave {1,2,both}` | Ola(s) a cargar. | `both` |
+| `--wave {1,2,both}` | Ola(s) a cargar. | `1` |
 | `--normalize {zscore,none}` | Normalización de `ps` por sesión. | `zscore` |
 | `--outdir <ruta>` | Carpeta de salida. | `networks/language-comparison/output` |
+| `--no-interactive` | Omite la generación de `network_interactive.html` (build). | — |
 
 Los flags compartidos siguen el esquema de `_add_shared_args()` de `cognitive-load`.
+
+### Formato del prefijo de build
+
+`langcomp_trial<T>_w<W>_<normalize>[_nops-<langs sin ps>]_<grupo>[_langs-<códigos>]`
+
+Ejemplos:
+
+- `langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no`
+- `langcomp_trial4_w2_zscore_nops-ch_s_sino-tibetan_langs-ch_t`
 
 ---
 
@@ -147,11 +160,58 @@ Los flags compartidos siguen el esquema de `_add_shared_args()` de `cognitive-lo
 | `edges.csv` | Aristas con ΔPS promedio, conteo y tipo. |
 | `graph.pkl` | Objeto `networkx.DiGraph` serializado. |
 | `network.graphml` | Red en GraphML (Gephi/Cytoscape). |
-| `metadata.json` | Parámetros del build + `lang_group`, `languages`, `accuracy` + hashes de fuentes. |
+| `metadata.json` | Parámetros del build + `lang_group`, `languages`, `accuracy`, `n_participants` + hashes de fuentes. |
 | `plots/` | Gráficos estáticos (serie temporal PS, heatmap, grafo). |
 | `network_interactive.html` | Red interactiva (pyvis). |
+| `stats/` | Métricas globales, de nodo, de aristas, cascadas y comunidades (tras `stats`). |
+
+### Ejemplo de `metadata.json`
+
+```json
+{
+  "prefix": "langcomp_trial4_w1_zscore_germanic_langs-du-en-ge-no",
+  "lang_group": "germanic",
+  "languages": ["du", "en", "ge", "no"],
+  "n_participants": 176,
+  "n_with_accuracy": 176,
+  "accuracy": {
+    "mean": 0.7204,
+    "median": 0.75,
+    "std": 0.126,
+    "min": 0.2917,
+    "max": 0.9583,
+    "n": 176
+  },
+  "n_nodes": 142,
+  "n_edges": 474,
+  "source_files": [{ "path": "...", "sha256": "..." }]
+}
+```
 
 `output/` está en `.gitignore` (`networks/*/output/`).
+
+---
+
+## Cómo comparar familias
+
+Cada build guarda su `accuracy` y métricas en `metadata.json`. Para comparar
+familias sobre el mismo trial/wave, se construyen los builds de las familias
+de interés y se leen sus `metadata.json`:
+
+```bash
+python networks/language-comparison/langcomp.py build --lang-group germanic --trialid 4 --wave 1
+python networks/language-comparison/langcomp.py build --lang-group romance --trialid 4 --wave 1
+python networks/language-comparison/langcomp.py build --lang-group slavic  --trialid 4 --wave 1
+```
+
+Luego, para ver el accuracy de cada familia:
+
+```bash
+python -c "import json,glob; [print(f'{m[\"lang_group\"]}: {m[\"accuracy\"][\"mean\"]} (n={m[\"accuracy\"][\"n\"]})') for m in (json.load(open(p)) for p in glob.glob('networks/language-comparison/output/langcomp_trial4_w1_*/*/metadata.json'))]"
+```
+
+Para comparar qué palabras reciben más atención por familia, se cargan los
+`nodes.csv` de cada build y se cruzan por `wordnum`/`word`.
 
 ---
 
