@@ -17,3 +17,5 @@ output/
 networks/*/output/
 lib/
 settings.json
+
+AGENTS.md
