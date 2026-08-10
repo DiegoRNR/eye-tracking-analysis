@@ -127,7 +127,7 @@ def visualize_network_interactive(G, build_dir, prefix):
         word = d.get("word", str(n))
         title = (
             f'<div style="{node_card_css}">'
-            f'<div style="{node_card_header_css}">Métricas</div>'
+            f'<div style="{node_card_header_css}">{word}</div>'
             f'<div style="{node_card_grid_css}">'
             f'<span style="{node_card_label_css}">wordnum</span>'
             f'<span>{d.get("wordnum", 0)}</span>'
@@ -213,6 +213,7 @@ def visualize_network_interactive(G, build_dir, prefix):
     css_overrides = """
     <style>
         #loadingBar { display: none !important; }
+        .vis-tooltip { display: none !important; }
         
         #custom-legend {
             position: fixed;
@@ -250,6 +251,84 @@ def visualize_network_interactive(G, build_dir, prefix):
             font-weight: 600;
             font-size: 13px;
         }
+        
+        /* --- Filter panel: left sidebar, mirroring legend --- */
+        #custom-filter-panel {
+            position: fixed;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            z-index: 9998;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 10px 14px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            font-family: sans-serif;
+            font-size: 12px;
+            width: 250px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        #custom-filter-panel select,
+        #custom-filter-panel input {
+            width: 100%;
+            padding: 6px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            box-sizing: border-box;
+            font-family: inherit;
+            font-size: 11px;
+            margin-bottom: 4px;
+        }
+        #custom-filter-panel .ts-wrapper {
+            width: 100% !important;
+            margin-bottom: 4px;
+        }
+        #custom-filter-panel button,
+        #custom-filter-panel input[type="button"] {
+            width: 100%;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            margin-top: 6px;
+            font-family: inherit;
+            font-size: 13px;
+        }
+        #custom-filter-panel button:hover,
+        #custom-filter-panel input[type="button"]:hover {
+            background: #1a252f;
+        }
+        #custom-filter-panel center {
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+            text-align: left;
+            gap: 4px;
+        }
+
+        #filter-toggle-btn {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 10000;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            cursor: pointer;
+            font-family: sans-serif;
+            font-weight: 600;
+            font-size: 13px;
+        }
 
         @media (max-width: 768px) {
             #custom-legend {
@@ -259,9 +338,15 @@ def visualize_network_interactive(G, build_dir, prefix):
                 transform: none;
                 width: auto;
                 max-width: 260px;
-                display: none; /* hidden on mobile initially */
+                display: none;
             }
             #legend-toggle-btn {
+                display: block;
+            }
+            #custom-filter-panel {
+                display: none;
+            }
+            #filter-toggle-btn {
                 display: block;
             }
         }
@@ -342,11 +427,12 @@ def visualize_network_interactive(G, build_dir, prefix):
             tooltipDiv.style.pointerEvents = "none";
             document.body.appendChild(tooltipDiv);
 
+            var tooltips = {};
             var updateItems = function(dataset) {
                 var items = dataset.get().map(function(item) {
                     if (item.title) {
-                        item._html_tooltip = item.title;
-                        item.title = null; 
+                        tooltips[item.id] = item.title;
+                        item.title = null;
                     }
                     return item;
                 });
@@ -355,24 +441,45 @@ def visualize_network_interactive(G, build_dir, prefix):
             updateItems(nodes);
             updateItems(edges);
 
+            var nodeWhitelist = ["wordnum", "sentnum", "word"];
+            for (var nodeId in allNodes) {
+                if (!allNodes.hasOwnProperty(nodeId)) continue;
+                var node = allNodes[nodeId];
+                var keep = {};
+                for (var k = 0; k < nodeWhitelist.length; k++) {
+                    var f = nodeWhitelist[k];
+                    if (node[f] !== undefined) keep[f] = node[f];
+                }
+                for (var key in node) delete node[key];
+                for (var key in keep) node[key] = keep[key];
+            }
+            for (var edgeId in allEdges) {
+                if (!allEdges.hasOwnProperty(edgeId)) continue;
+                var edge = allEdges[edgeId];
+                var ekeep = {};
+                if (edge["from"] !== undefined) ekeep["from"] = edge["from"];
+                if (edge["to"] !== undefined) ekeep["to"] = edge["to"];
+                for (var key in edge) delete edge[key];
+                for (var key in ekeep) edge[key] = ekeep[key];
+            }
+
             network.on("hoverNode", function(params) {
-                var node = nodes.get(params.node);
-                if (node && node._html_tooltip) {
-                    tooltipDiv.innerHTML = node._html_tooltip;
+                if (tooltips[params.node]) {
+                    tooltipDiv.innerHTML = tooltips[params.node];
                     tooltipDiv.style.display = "block";
                 }
             });
             network.on("blurNode", function() { tooltipDiv.style.display = "none"; });
 
             network.on("hoverEdge", function(params) {
-                var edge = edges.get(params.edge);
-                if (edge && edge._html_tooltip) {
-                    tooltipDiv.innerHTML = edge._html_tooltip;
+                if (tooltips[params.edge]) {
+                    tooltipDiv.innerHTML = tooltips[params.edge];
                     tooltipDiv.style.display = "block";
                 }
             });
             network.on("blurEdge", function() { tooltipDiv.style.display = "none"; });
 
+            // Legend Tooltips
             document.querySelectorAll("[data-tooltip]").forEach(function(el) {
                 el.addEventListener("mouseenter", function() {
                     tooltipDiv.innerHTML = '<div style="max-width:220px;font-size:12px;background:rgba(255,255,255,0.95);border:1px solid #ccc;border-radius:6px;padding:8px 10px;box-shadow:0 2px 4px rgba(0,0,0,0.15);color:#333;line-height:1.4;">' + el.getAttribute("data-tooltip") + '</div>';
@@ -383,6 +490,7 @@ def visualize_network_interactive(G, build_dir, prefix):
                 });
             });
 
+            // Global Mouse Follower
             document.addEventListener("mousemove", function(e) {
                 if (tooltipDiv.style.display === "block") {
                     var x = e.pageX + 15;
@@ -395,32 +503,11 @@ def visualize_network_interactive(G, build_dir, prefix):
                 }
             });
 
-            var container = document.getElementById("mynetwork");
-
-            var filterElements = [];
-            var sibling = container.previousElementSibling;
-            while (sibling) {
-                if (["SELECT", "BUTTON", "INPUT", "LABEL"].includes(sibling.tagName) || sibling.id === "config") {
-                    filterElements.push(sibling);
-                }
-                sibling = sibling.previousElementSibling;
-            }
-            
-            if (filterElements.length > 0) {
+            // --- Filter Panel (left sidebar, vertical layout) ---
+            var filterMenu = document.getElementById("filter-menu");
+            if (filterMenu) {
                 var panel = document.createElement("div");
-                panel.style.position = "absolute";
-                panel.style.top = "20px";
-                panel.style.left = "20px";
-                panel.style.backgroundColor = "rgba(255, 255, 255, 0.95)";
-                panel.style.padding = "12px 16px";
-                panel.style.borderRadius = "8px";
-                panel.style.boxShadow = "0 4px 6px rgba(0,0,0,0.3)";
-                panel.style.zIndex = "9998";
-                panel.style.display = "flex";
-                panel.style.flexDirection = "column";
-                panel.style.fontFamily = "sans-serif";
-                panel.style.fontSize = "13px";
-                panel.style.maxWidth = "280px";
+                panel.id = "custom-filter-panel";
 
                 var header = document.createElement("div");
                 header.innerHTML = "<strong>Filtros y Controles</strong>";
@@ -429,46 +516,145 @@ def visualize_network_interactive(G, build_dir, prefix):
                 header.style.justifyContent = "space-between";
                 header.style.alignItems = "center";
                 header.style.paddingBottom = "6px";
-                
+                header.style.width = "100%";
+
                 var toggleIcon = document.createElement("span");
-                toggleIcon.innerHTML = "▼";
+                toggleIcon.innerHTML = "\u25bc";
                 toggleIcon.style.fontSize = "10px";
                 header.appendChild(toggleIcon);
 
                 var content = document.createElement("div");
                 content.style.display = "flex";
                 content.style.flexDirection = "column";
-                content.style.gap = "8px";
                 content.style.marginTop = "8px";
                 content.style.borderTop = "1px solid #ccc";
                 content.style.paddingTop = "8px";
+                content.style.width = "100%";
 
-                filterElements.reverse().forEach(function(el) {
-                    content.appendChild(el);
-                    if (el.tagName === "SELECT" || el.tagName === "INPUT") {
-                        el.style.width = "100%";
-                        el.style.padding = "6px";
-                        el.style.borderRadius = "4px";
-                        el.style.border = "1px solid #ccc";
-                        el.style.boxSizing = "border-box";
-                    }
+                content.appendChild(filterMenu);
+
+                var row = filterMenu.querySelector(".row");
+                if (row) {
+                    row.style.display = "flex";
+                    row.style.flexDirection = "column";
+                    row.style.gap = "4px";
+                    row.style.margin = "0";
+                }
+                var cols = filterMenu.querySelectorAll("[class*='col-']");
+                for (var ci = 0; ci < cols.length; ci++) {
+                    cols[ci].style.flex = "1 0 auto";
+                    cols[ci].style.width = "100%";
+                    cols[ci].style.maxWidth = "none";
+                    cols[ci].style.padding = "0";
+                }
+
+                filterMenu.querySelectorAll(".ts-wrapper").forEach(function(w) {
+                    w.style.width = "100%";
                 });
+
+                var btns = filterMenu.querySelectorAll("button");
+                for (var bi = 0; bi < btns.length; bi++) {
+                    var txt = btns[bi].textContent.trim();
+                    if (txt === "Filter") btns[bi].textContent = "Filtrar";
+                    else if (txt === "Reset Selection") btns[bi].textContent = "Restablecer";
+                }
+
+                var selects = filterMenu.querySelectorAll("select");
+                for (var si = 0; si < selects.length; si++) {
+                    var sid = selects[si].id;
+                    if (sid === "select-item") {
+                        var opts = selects[si].options;
+                        for (var oi = 0; oi < opts.length; oi++) {
+                            if (opts[oi].value === "" && opts[oi].text.indexOf("Select") !== -1)
+                                opts[oi].text = "Seleccione un elemento de la red";
+                            else if (opts[oi].value === "node") opts[oi].text = "Nodo";
+                            else if (opts[oi].value === "edge") opts[oi].text = "Enlace";
+                        }
+                    } else if (sid === "select-property") {
+                        var popts = selects[si].options;
+                        for (var pi = 0; pi < popts.length; pi++) {
+                            if (popts[pi].value === "" && popts[pi].text.indexOf("Select") !== -1)
+                                popts[pi].text = "Selecciona una propiedad";
+                        }
+                    } else if (sid === "select-value") {
+                        var vopts = selects[si].options;
+                        for (var vi = 0; vi < vopts.length; vi++) {
+                            if (vopts[vi].value === "" && vopts[vi].text.indexOf("Select") !== -1)
+                                vopts[vi].text = "Seleccione un valor";
+                        }
+                    }
+                }
+
+                if (typeof itemControl !== "undefined") {
+                    itemControl.settings.placeholder = "Seleccione un elemento de la red";
+                    if (itemControl.options["node"]) {
+                        itemControl.options["node"].title = "Nodo";
+                        itemControl.options["node"].text = "Nodo";
+                    }
+                    if (itemControl.options["edge"]) {
+                        itemControl.options["edge"].title = "Enlace";
+                        itemControl.options["edge"].text = "Enlace";
+                    }
+                    itemControl.sync();
+                }
+                if (typeof propControl !== "undefined") {
+                    propControl.settings.placeholder = "Selecciona una propiedad";
+                    propControl.sync();
+                }
+                if (typeof valueControl !== "undefined") {
+                    valueControl.settings.placeholder = "Seleccione un valor";
+                    valueControl.sync();
+                }
+
+                var itemSelect = document.getElementById("select-item");
+                if (itemSelect) {
+                    itemSelect.addEventListener("change", function() {
+                        setTimeout(function() {
+                            if (typeof propControl === "undefined") return;
+                            var edgeLabels = {"from": "Desde", "to": "Hasta"};
+                            var keys = Object.keys(edgeLabels);
+                            for (var k = 0; k < keys.length; k++) {
+                                var f = keys[k];
+                                if (propControl.getOption(f)) {
+                                    propControl.removeOption(f);
+                                    propControl.addOption({id: f, title: edgeLabels[f]});
+                                }
+                            }
+                        }, 60);
+                    });
+                }
 
                 header.onclick = function() {
                     if (content.style.display === "none") {
                         content.style.display = "flex";
-                        toggleIcon.innerHTML = "▼";
+                        toggleIcon.innerHTML = "\u25bc";
                     } else {
                         content.style.display = "none";
-                        toggleIcon.innerHTML = "▲";
+                        toggleIcon.innerHTML = "\u25b2";
                     }
                 };
 
                 panel.appendChild(header);
                 panel.appendChild(content);
                 document.body.appendChild(panel);
+
+                var filterToggle = document.createElement("button");
+                filterToggle.id = "filter-toggle-btn";
+                filterToggle.textContent = "Mostrar Filtros";
+                filterToggle.onclick = function() {
+                    var vis = panel.style.display !== "none";
+                    if (vis) {
+                        panel.style.display = "none";
+                        filterToggle.textContent = "Mostrar Filtros";
+                    } else {
+                        panel.style.display = "flex";
+                        filterToggle.textContent = "Ocultar Filtros";
+                    }
+                };
+                document.body.appendChild(filterToggle);
             }
 
+            // --- Highlight Logic ---
             function setHighlight(selectedIds) {
                 if (!selectedIds || selectedIds.length === 0) {
                     var resetNodes = nodes.get().map(function(n) { n.opacity = 1.0; return n; });
