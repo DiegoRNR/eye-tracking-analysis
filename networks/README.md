@@ -9,6 +9,8 @@ Cada tipo de red del proyecto vive en su propia subcarpeta, siguiendo un esquema
 | Carpeta | Qué modela | Estado |
 |---------|------------|--------|
 | [`cognitive-load/`](cognitive-load/README.md) | Carga cognitiva via ΔPS entre palabras consecutivas; cascadas pupilares y modularidad del esfuerzo. | Implementada |
+| [`language-comparison/`](language-comparison/README.md) | Carga cognitiva agrupada por familia lingüística de la L1, con la comprensión lectora (`accuracy`) adjunta. | Implementada |
+| [`regression-comparison/`](regression-comparison/README.md) | Scanpath en orden temporal con aristas tipadas (avance / regresión intra e inter-oración) por familia lingüística. | `build` y `compare` implementados; `stats` pendiente |
 | [`scanpath/`](scanpath/README.md) | Transiciones de sacadas entre palabras; reciprocidad, regresiones, PageRank. | En transición al esquema estándar |
 | [`alignment/`](alignment/README.md) | Compara la red de sacadas con la estructura semántica/sintáctica del texto. | Pendiente |
 | [`bipartite/`](bipartite/README.md) | Red participante ↔ palabra con métricas de fijación como pesos. | Pendiente |
