@@ -83,11 +83,17 @@ python networks/language-comparison/langcomp.py compare --trialid 4 --wave 1
 
 # 4. Abrir el reporte comparativo en el navegador
 start networks/language-comparison/output/comparison_trial4_w1/comparison_report.html
+
+# 5. (Opcional) HTML único autocontenido con todas las redes (ideal para subir a la web)
+python networks/language-comparison/make_combined_html.py --trialid 4 --wave 1
+start networks/language-comparison/output/combined_trial4_w1.html
 ```
 
 > **Importante:** abrir `comparison_report.html` **desde su carpeta**
 > (`output/comparison_trial4_w1/`) para que los iframes relativos a cada
 > `network_interactive.html` de las familias carguen correctamente.
+> El `combined_trial4_w1.html` del paso 5, en cambio, es **autocontenido**:
+> no necesita archivos vecinos ni internet para los datos (solo CDN para vis.js).
 
 ### Flags de `build` y `stats`
 
@@ -138,6 +144,7 @@ Ejemplos:
 networks/language-comparison/
 ├── README.md                 # Este archivo
 ├── langcomp.py               # Entry point CLI: subcomandos `build`, `stats`, `compare`
+├── make_combined_html.py     # Script: genera UN HTML autocontenido con las redes de todas las familias
 ├── core/
 │   ├── __init__.py           # Re-exporta SOLO la API pública
 │   ├── language_groups.py    # Mapeo de códigos L1 → familia lingüística
@@ -312,6 +319,63 @@ output/comparison_trial4_w1/
    con `--no-interactive`), se regenera desde su `graph.pkl`.
 3. Recolecta accuracy + métricas por familia en `comparison_summary.csv` y el
    HTML.
+
+---
+
+## HTML único autocontenido: `make_combined_html.py`
+
+`comparison_report.html` usa **iframes** hacia los `network_interactive.html`
+de cada familia (rutas relativas). Al subirlo a una página web como un único
+archivo, las redes dan **error 404** porque faltan los archivos hermanos.
+
+Para ese caso existe `make_combined_html.py`: lee los builds ya generados
+(`graph.pkl` + `metadata.json` + plots comparativos) y produce **un solo HTML
+autocontenido** con todas las redes de las familias, renderizadas con **un solo
+`vis.Network` que hace swap de datos** al cambiar de pestaña (una sola
+simulación de física activa a la vez).
+
+```bash
+# Genera output/combined_trial4_w1.html
+python networks/language-comparison/make_combined_html.py --trialid 4 --wave 1
+
+# Otros ejemplos
+python networks/language-comparison/make_combined_html.py --wave 2
+python networks/language-comparison/make_combined_html.py --trialid 2 --wave 1 --out mi_reporte.html
+```
+
+### Flags
+
+| Flag | Descripción | Default |
+|------|-------------|---------|
+| `--trialid <1-12>` | ID del texto. | `4` |
+| `--wave {1,2}` | Ola a cargar. | `1` |
+| `--out <ruta>` | Ruta de salida. | `output/combined_trial<X>_w<Y>.html` |
+
+### Contenido del HTML generado
+
+- **Tabla resumen** de accuracy y métricas por familia (orden canónico, igual que
+  `comparison_report.html`).
+- **Plots comparativos** embebidos en base64.
+- **Pestañas por familia** + **una red** en un solo contenedor (`#net-wrap`):
+  al cambiar de pestaña se llama `setData` con los nodos/aristas de esa familia.
+- **Leyenda** en la esquina inferior derecha del visualizador (colores viridis
+  para `mean_ps`, tamaños por `fix_count`, colores coolwarm para `mean_dps`,
+  grosores por `count`), con rangos **actualizados por familia** al cambiar de
+  pestaña.
+- **Tooltips de texto plano** en nodos y aristas (mismos que la red individual).
+
+### Diferencias con `comparison_report.html`
+
+| | `comparison_report.html` | `combined_trial<X>_w<Y>.html` |
+|---|---|---|
+| Depende de archivos vecinos | Sí (iframes a las redes por familia) | **No** (autocontenido) |
+| Número de `vis.Network` | 1 por iframe (7 simultáneos) | 1 único con swap de datos |
+| Subible como archivo único | No (da 404 en las redes) | **Sí** |
+| Requiere internet | Sí (CDN vis.js) | Sí (CDN vis.js) |
+
+> **Nota:** ambos requieren acceso a internet para cargar `vis-network.min.js`
+> desde CDN. El script **no modifica** `langcomp.py`, `comparison.py` ni los
+> builds existentes; solo lee outputs y escribe el HTML nuevo.
 
 ---
 
