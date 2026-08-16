@@ -28,9 +28,6 @@ aristas hacia adelante— esta red conserva las **regresiones** y las
 **Librerías:** `networkx`, `pandas`, `numpy`, `matplotlib`, `pyvis`. Sin
 dependencias nuevas respecto de `pyproject.toml`.
 
-> Especificación completa y evidencia preliminar:
-> [`propuesta-red-regresiones.html`](../language-comparison/propuesta-red-regresiones.html).
-
 ---
 
 ## Estado
@@ -242,7 +239,6 @@ densidad hace falta rarefacción a `n` común, todavía no implementada.
 
 ## Referencias
 
-- Propuesta y evidencia: [`propuesta-red-regresiones.html`](../language-comparison/propuesta-red-regresiones.html).
 - Esquema estándar: [`networks/README.md`](../README.md).
 - Red de referencia canónica: [`networks/cognitive-load/README.md`](../cognitive-load/README.md).
 - Capa de agrupación reutilizada: [`networks/language-comparison/README.md`](../language-comparison/README.md).
