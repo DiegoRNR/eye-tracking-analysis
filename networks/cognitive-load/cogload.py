@@ -1,20 +1,17 @@
 """
 cogload.py
 
-Single CLI entry point for the cognitive-load network pipeline.
+CLI entry point para el pipeline de red de carga cognitiva.
 
-Usage:
+Uso:
   python cogload.py build [shared-build-args]
   python cogload.py stats [--load DIR] [shared-build-args] [stats-args]
+  python cogload.py analysis [--load DIR] [--outdir DIR] [--name SUFIJO] [--top-n N]
 
-Shared build args: --subid --lang --trialid --wave --groupby
+Shared build args: --subid --lang --trialid --itemid --wave --groupby
                    --normalize --edge-mode --edge-window --outdir
 Stats-only args:   --load --cascade-window --z-thresh --p-thresh --name
-
-Examples:
-  python cogload.py build --subid du_7 --trialid 4 --wave 1
-  python cogload.py stats --load networks/cognitive-load/output/cogload_trial4_w1_zscore_sequential_subdu_7
-  python cogload.py stats --subid du_7 --trialid 4 --wave 1
+Analysis args:     --load --outdir --name --top-n
 """
 
 import argparse
@@ -28,6 +25,7 @@ if _PARENT not in sys.path:
     sys.path.insert(0, _PARENT)
 
 from core import (
+    analysis_from_cache,
     build_cogload_network,
     build_prefix,
     check_cache_fresh,
@@ -43,6 +41,7 @@ def _add_shared_args(parser):
     parser.add_argument("--subid", type=str, help="Filtrar por participante (uniform_id, ej. du_4).")
     parser.add_argument("--lang", type=str, help="Filtrar por L1 (ej. du, es, de, it).")
     parser.add_argument("--trialid", type=str, default="1", help="ID de texto [1-12] (por defecto: 1).")
+    parser.add_argument("--itemid", type=str, help="ID del item/texto (alias de trialid, más preciso).")
     parser.add_argument(
         "--wave",
         type=str,
@@ -61,21 +60,21 @@ def _add_shared_args(parser):
         "--normalize",
         type=str,
         default="zscore",
-        choices=["zscore", "none"],
-        help="Normalización de PS por sesión: 'zscore' (default) o 'none' (crudo).",
+        choices=["zscore", "robust", "none"],
+        help="Normalización de PS por sesión: 'zscore' (default), 'robust' o 'none' (crudo).",
     )
     parser.add_argument(
         "--edge-mode",
         type=str,
-        default="sequential",
-        choices=["sequential", "window", "regression"],
-        help="Definición de aristas: 'sequential' (i→i+1), 'window' (i→i+1..i+k) o 'regression' (sólo saltos cruzando oraciones hacia atrás).",
+        default="temporal",
+        choices=["textual", "temporal", "refixations", "regressions"],
+        help="Modo de aristas: 'textual' (adyacencia lineal), 'temporal' (navegación completa), 'refixations' (relecturas), 'regressions' (saltos atrás).",
     )
     parser.add_argument(
         "--edge-window",
         type=int,
         default=4,
-        help="Tamaño de la ventana hacia adelante cuando --edge-mode=window (default 4).",
+        help="Tamaño de ventana hacia adelante (reservado para uso futuro, default 4).",
     )
     parser.add_argument(
         "--outdir",
@@ -106,24 +105,20 @@ def _add_stats_args(parser):
 def _run_build_pipeline(args, do_interactive=True, within_sentence=False):
     """
     Carga fijaciones, construye la red, la persiste y genera los plots base.
-    Si do_interactive es True (default), genera además el HTML interactivo vía
-    pyvis. Si pyvis no está instalado, degrada con un warning y continúa.
-    Si within_sentence es True, las aristas se restringen a dentro de cada
-    oración (modo per-sentence). Retorna la ruta del build_dir, o None si no
-    se encontraron fijaciones.
     """
     fixations, source_files = load_all_fixations(
         wave=args.wave,
         uniform_id=args.subid,
         lang=args.lang,
-        trialid=args.trialid,
+        trialid=args.itemid or args.trialid,
         normalize=args.normalize,
     )
     if not fixations:
         print("[!] No se encontraron fijaciones con los criterios especificados.")
         return None
 
-    text_label = f"Trial_{args.trialid}"
+    trialid_for_label = args.itemid or args.trialid
+    text_label = f"Trial_{trialid_for_label}"
     if args.lang:
         text_label += f"_Lang_{args.lang}"
     if args.subid:
@@ -148,7 +143,7 @@ def _run_build_pipeline(args, do_interactive=True, within_sentence=False):
         wave=args.wave,
         subid=args.subid,
         lang=args.lang,
-        trialid=args.trialid,
+        trialid=args.itemid or args.trialid,
         normalize=args.normalize,
         edge_mode=args.edge_mode,
         edge_window=args.edge_window,
@@ -209,6 +204,49 @@ def stats_command(args):
     return 0
 
 
+def analysis_command(args):
+    """Ejecuta el análisis completo: centralidades, Louvain, k-core, asortatividad."""
+    import glob as globmod
+
+    build_dirs = []
+
+    if args.load:
+        # Modo cache: un solo build
+        if not os.path.isdir(args.load):
+            print(f"[ERROR] No existe la carpeta de build: {args.load}")
+            return 1
+        meta_path = os.path.join(args.load, "metadata.json")
+        if os.path.exists(meta_path):
+            import json
+            with open(meta_path, "r", encoding="utf-8") as f:
+                meta = json.load(f)
+            check_cache_fresh(meta, [s["path"] for s in meta.get("source_files", [])])
+        build_dirs = [args.load]
+    else:
+        # Analizar todos los builds en outdir que empiecen con 'cogload_'
+        pattern = os.path.join(args.outdir, "nav_*")
+        build_dirs = sorted(globmod.glob(pattern))
+        build_dirs = [d for d in build_dirs if os.path.isdir(d)]
+
+    if not build_dirs:
+        print("[!] No se encontraron builds para analizar.")
+        return 1
+
+    print(f"--> Analizando {len(build_dirs)} build(s)...\n")
+
+    for bd in build_dirs:
+        print(f"\n{'=' * 60}")
+        print(f"ANALIZANDO: {os.path.basename(bd)}")
+        print(f"{'=' * 60}")
+        try:
+            analysis_from_cache(bd, name_suffix=args.name, top_n=args.top_n)
+        except Exception as e:
+            print(f"[ERROR] Fallo al analizar {bd}: {e}")
+
+    print(f"\n[ÉXITO] Análisis completado para {len(build_dirs)} build(s).")
+    return 0
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(
         prog="cogload",
@@ -224,12 +262,12 @@ def main(argv=None):
     build_p.add_argument(
         "--no-interactive",
         action="store_true",
-        help="Omite la generación del HTML interactivo (network_interactive.html). Por defecto se genera vía pyvis.",
+        help="Omite la generación del HTML interactivo (network_interactive.html).",
     )
     build_p.add_argument(
         "--per-sentence",
         action="store_true",
-        help="Restringe aristas a dentro de la oración. Por defecto se enlaza el texto completo (w → w_next cruzando oraciones).",
+        help="Restringe aristas a dentro de la oración.",
     )
 
     stats_p = subparsers.add_parser(
@@ -239,11 +277,41 @@ def main(argv=None):
     _add_shared_args(stats_p)
     _add_stats_args(stats_p)
 
+    analysis_p = subparsers.add_parser(
+        "analysis",
+        help="Análisis completo: centralidades, Louvain, k-core, asortatividad.",
+    )
+    analysis_p.add_argument(
+        "--load",
+        type=str,
+        help="Ruta a una carpeta de build existente. Si se omite, analiza todos los builds en outdir.",
+    )
+    analysis_p.add_argument(
+        "--outdir",
+        type=str,
+        default=os.path.join("networks", "cognitive-load", "output"),
+        help="Carpeta raíz donde buscar builds (default: networks/cognitive-load/output).",
+    )
+    analysis_p.add_argument(
+        "--name",
+        type=str,
+        default="",
+        help="Sufijo para nombres de archivos de stats/plots.",
+    )
+    analysis_p.add_argument(
+        "--top-n",
+        type=int,
+        default=10,
+        help="Cantidad de nodos en los rankings de centralidad (default: 10).",
+    )
+
     args = parser.parse_args(argv)
     if args.command == "build":
         return build_command(args)
     if args.command == "stats":
         return stats_command(args)
+    if args.command == "analysis":
+        return analysis_command(args)
     parser.error(f"Subcomando desconocido: {args.command}")
     return 2
 

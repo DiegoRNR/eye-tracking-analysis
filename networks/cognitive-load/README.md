@@ -26,7 +26,7 @@ El diámetro pupilar (`ps` en `data/MECO-L2_version-2.2/.../joint_l2_fixation_tr
 ```
 networks/cognitive-load/
 ├── README.md                 # Este archivo (referencia de estructura)
-├── cogload.py                # Entry point CLI: subcomandos `build` y `stats`
+├── cogload.py                # Entry point CLI: subcomandos `build`, `stats` y `analysis`
 ├── core/                     # Librería interna (toda la lógica vive aquí)
 │   ├── __init__.py           # Re-exporta SOLO la API pública
 │   ├── data_io.py            # Carga de fijaciones desde data/MECO-L2_version-2.2
@@ -42,6 +42,9 @@ networks/cognitive-load/
 │       ├── modularity.py
 │       ├── orchestrator.py   # Coordina el cálculo de stats sobre un build
 │       ├── exports.py
+│       ├── centrality.py     # Centralidades, Louvain, k-core, asortatividad
+│       ├── centrality_export.py
+│       ├── centrality_viz.py
 │       └── viz.py
 └── output/                   # Builds generados (gitignored)
 ```
@@ -64,7 +67,7 @@ O con algunos parámetros:
 python networks/cognitive-load/cogload.py build --subid du_7 --trialid 4 --wave 1
 ```
 
-Salida en `networks/cognitive-load/output/cogload_trial4_w1_zscore_sequential_subdu_7/`.
+Salida en `networks/cognitive-load/output/cogload_trial4_w1_zscore_temporal_subdu_7/`.
 
 ### Calcular estadísticas sobre un build
 
@@ -82,7 +85,20 @@ O desde una red ya construida:
 
 ```bash
 python networks/cognitive-load/cogload.py stats \
-  --load networks/cognitive-load/output/cogload_trial4_w1_zscore_sequential_subdu_7
+  --load networks/cognitive-load/output/cogload_trial4_w1_zscore_temporal_subdu_7
+```
+
+### Ejecutar análisis completo (centralidades, Louvain, k-core)
+
+```bash
+python networks/cognitive-load/cogload.py analysis \
+  --load networks/cognitive-load/output/cogload_trial4_w1_zscore_temporal_subdu_7
+```
+
+O analizar todos los builds en el directorio de salida:
+
+```bash
+python networks/cognitive-load/cogload.py analysis --top-n 15
 ```
 
 ### Flags útiles
@@ -90,14 +106,15 @@ python networks/cognitive-load/cogload.py stats \
 - `--subid <id>`: filtra por participante (`uniform_id`, ej. `du_4`).
 - `--lang <l1>`: filtra por lengua materna (ej. `du`, `es`, `de`, `it`).
 - `--trialid <1-12>`: ID del texto (default `1`).
+- `--itemid <id>`: ID del item/texto (alias de `--trialid`, más preciso).
 - `--wave {1,2,both}`: ola(s) a cargar (default `both`).
 - `--groupby {participant,lang,all}`: agregación de sesiones (default `all`).
-- `--normalize {zscore,none}`: normalización de `PS` por sesión (default `zscore`).
-- `--edge-mode {sequential,window,regression}`: definición de aristas (default `sequential`).
-- `--edge-window N`: tamaño de ventana hacia adelante cuando `--edge-mode=window` (default 4).
+- `--normalize {zscore,robust,none}`: normalización de `PS` por sesión (default `zscore`).
+- `--edge-mode {textual,temporal,refixations,regressions}`: definición de aristas (default `temporal`).
+- `--edge-window N`: tamaño de ventana (reservado para uso futuro, default 4).
 - `--per-sentence`: restringe aristas a dentro de la oración.
 - `--no-interactive`: omite la generación del HTML con pyvis.
-- `--name SUFIJO`: sufijo para los archivos de stats/plots.
+- `--name SUFIJO`: sufijo para los archivos de stats/plots (solo `stats`/`analysis`).
 
 ---
 
