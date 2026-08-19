@@ -9,10 +9,11 @@ from .cascades import detect_cognitive_load_cascades
 from .exports import export_cogload_report
 from .metrics import compute_cogload_metrics
 from .modularity import compute_effort_modularity
-from .orchestrator import stats_from_cache
+from .orchestrator import analysis_from_cache, stats_from_cache
 from .viz import visualize_cogload_cascades, visualize_community_along_text
 
 __all__ = [
+    "analysis_from_cache",
     "compute_cogload_metrics",
     "compute_effort_modularity",
     "detect_cognitive_load_cascades",

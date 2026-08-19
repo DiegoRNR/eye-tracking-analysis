@@ -31,7 +31,7 @@ def compute_cogload_metrics(G, top_decile=0.10):
     in_strength = {n: 0.0 for n in G.nodes}
     out_strength = {n: 0.0 for n in G.nodes}
     for u, v, d in G.edges(data=True):
-        w = d.get("mean_dps", 0.0)
+        w = d.get("mean_dps_abs", d.get("mean_dps", 0.0))
         out_strength[u] += w
         in_strength[v] += w
 
@@ -52,7 +52,7 @@ def compute_cogload_metrics(G, top_decile=0.10):
     raw_ps_nonzero = raw_ps_values[raw_ps_values > 0]
 
     dps_values = np.array(
-        [d.get("mean_dps", 0.0) for _, _, d in G.edges(data=True)], dtype=float
+        [d.get("mean_dps_abs", d.get("mean_dps", 0.0)) for _, _, d in G.edges(data=True)], dtype=float
     )
 
     threshold = (
@@ -71,8 +71,8 @@ def compute_cogload_metrics(G, top_decile=0.10):
         "n_edges": n_edges,
         "density": round(density, 4),
         "signal_field": signal_key,
-        "mean_dps": round(float(np.mean(dps_values)) if dps_values.size else 0.0, 4),
-        "max_dps": round(float(np.max(dps_values)) if dps_values.size else 0.0, 4),
+        "mean_dps_abs": round(float(np.mean(dps_values)) if dps_values.size else 0.0, 4),
+        "max_dps_abs": round(float(np.max(dps_values)) if dps_values.size else 0.0, 4),
         "mean_signal": round(ps_mean, 4),
         "signal_std": round(ps_std, 4),
         "signal_range": round(

@@ -21,9 +21,7 @@ def compute_effort_modularity(G, z_threshold=0.5):
         low_stress   si mean_zscore < -z_threshold
         neutral      en otro caso
 
-    Devuelve además, por comunidad, mean_sentnum y sentnum_std para que
-    puedas ver si las comunidades se alinean con la estructura de
-    oraciones.
+    El peso de las aristas es `mean_dps_abs` (delta PS absoluto medio).
     """
     if G.number_of_nodes() == 0:
         return [], 0.0
@@ -33,9 +31,9 @@ def compute_effort_modularity(G, z_threshold=0.5):
         modularity_score = 0.0
     else:
         communities = list(
-            nx.community.greedy_modularity_communities(G, weight="weight")
+            nx.community.greedy_modularity_communities(G, weight="mean_dps_abs")
         )
-        modularity_score = nx.community.modularity(G, communities, weight="weight")
+        modularity_score = nx.community.modularity(G, communities, weight="mean_dps_abs")
 
     signal_key = _signal_field(G)
     has_z = signal_key == "mean_ps_z"
@@ -70,7 +68,7 @@ def compute_effort_modularity(G, z_threshold=0.5):
             G.nodes[n]["community_id"] = idx
             G.nodes[n]["community_label"] = label
         dps_vals = [
-            d.get("mean_dps", 0.0)
+            d.get("mean_dps_abs", 0.0)
             for u, v, d in G.edges(data=True)
             if u in comm and v in comm
         ]
