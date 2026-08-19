@@ -26,8 +26,8 @@ def save_built_network(
     subid=None,
     lang=None,
     trialid=None,
-    normalize="zscore",
-    edge_mode="sequential",
+    normalize="robust",
+    edge_mode="temporal",
     edge_window=4,
 ):
     """
@@ -83,13 +83,15 @@ def save_built_network(
     edges_path = os.path.join(build_dir, "edges.csv")
     with open(edges_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["source", "target", "mean_dps", "count", "n_sessions", "type"])
+        w.writerow(["source", "target", "mean_dps_abs", "mean_dps_signed", "weight", "count", "n_sessions", "type"])
         for u, v, d in G.edges(data=True):
             w.writerow(
                 [
                     u,
                     v,
-                    round(d.get("mean_dps", 0.0), 2),
+                    round(d.get("mean_dps_abs", 0.0), 4),
+                    round(d.get("mean_dps_signed", 0.0), 4),
+                    round(d.get("weight", 0.0), 4),
                     d.get("count", 0),
                     d.get("n_sessions", 0),
                     d.get("type", "forward"),
@@ -178,7 +180,9 @@ def load_built_network(build_dir):
             G.add_edge(
                 row["source"],
                 row["target"],
-                mean_dps=float(row.get("mean_dps", 0.0)),
+                mean_dps_abs=float(row.get("mean_dps_abs", row.get("mean_dps", 0.0))),
+                mean_dps_signed=float(row.get("mean_dps_signed", 0.0)),
+                weight=float(row.get("weight", row.get("mean_dps", 0.0))),
                 count=int(row.get("count", 0)),
                 n_sessions=int(row.get("n_sessions", 0)),
                 type=row.get("type", "forward"),
@@ -217,7 +221,5 @@ def check_cache_fresh(metadata, source_files):
             print(f"    sha256 cache : {expected[path]}")
             print(f"    sha256 ahora : {current}")
             print(
-                "    Vuelve a ejecutar cogload_network.py para refrescar la caché."
+                "    Vuelve a ejecutar cogload.py build para refrescar la caché."
             )
-        elif path in expected:
-            print(f"[OK] Caché vigente para: {path}")

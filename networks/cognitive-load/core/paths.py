@@ -2,13 +2,14 @@
 paths.py
 
 Rutas a los datasets MECO L2 y utilidades de hashing de archivos fuente.
+Resuelve rutas a archivos .clean.csv (preprocesados) para la red de carga cognitiva.
 """
 
 import hashlib
 import os
 
 
-WAVE_PATHS = {
+_RAW_WAVE_PATHS = {
     1: os.path.join(
         "data",
         "MECO-L2_version-2.2",
@@ -27,15 +28,48 @@ WAVE_PATHS = {
     ),
 }
 
+_CLEAN_WAVE_PATHS = {
+    1: os.path.join(
+        "data",
+        "MECO-L2_version-2.2",
+        "wave-1",
+        "primary-data",
+        "eye-tracking",
+        "joint_l2_fixation_trimmed_report_2.2.clean.csv",
+    ),
+    2: os.path.join(
+        "data",
+        "MECO-L2_version-2.2",
+        "wave-2",
+        "primary-data",
+        "eye-tracking",
+        "joint_fix_trimmed_L2_wave2_version2.2.clean.csv",
+    ),
+}
+
+# Para compatibilidad backward: la variable WAVE_PATHS apunta a los clean
+WAVE_PATHS = _CLEAN_WAVE_PATHS
+
 
 def resolve_wave_paths(wave):
-    """Resuelve las rutas de CSV para la(s) ola(s) solicitada(s)."""
+    """Resuelve las rutas de CSV limpio para la(s) ola(s) solicitada(s)."""
     if wave == "both":
-        return [WAVE_PATHS[1], WAVE_PATHS[2]]
+        return [_CLEAN_WAVE_PATHS[1], _CLEAN_WAVE_PATHS[2]]
     if wave in (1, "1"):
-        return [WAVE_PATHS[1]]
+        return [_CLEAN_WAVE_PATHS[1]]
     if wave in (2, "2"):
-        return [WAVE_PATHS[2]]
+        return [_CLEAN_WAVE_PATHS[2]]
+    raise ValueError(f"Valor de --wave inválido: {wave!r}. Use 1, 2 o 'both'.")
+
+
+def resolve_raw_wave_paths(wave):
+    """Resuelve las rutas de CSV originales (sin limpiar)."""
+    if wave == "both":
+        return [_RAW_WAVE_PATHS[1], _RAW_WAVE_PATHS[2]]
+    if wave in (1, "1"):
+        return [_RAW_WAVE_PATHS[1]]
+    if wave in (2, "2"):
+        return [_RAW_WAVE_PATHS[2]]
     raise ValueError(f"Valor de --wave inválido: {wave!r}. Use 1, 2 o 'both'.")
 
 

@@ -7,7 +7,7 @@ The entry point `cogload.py` lives at the parent directory and re-imports the
 public API defined here.
 """
 
-from .stats import stats_from_cache
+from .stats import analysis_from_cache, stats_from_cache
 from .data_io import (
     load_all_fixations,
     load_fixations_from_cache_metadata,
@@ -23,6 +23,7 @@ from .persistence import (
 from .visualization import visualize_cogload_network
 
 __all__ = [
+    "analysis_from_cache",
     "build_cogload_network",
     "build_prefix",
     "check_cache_fresh",

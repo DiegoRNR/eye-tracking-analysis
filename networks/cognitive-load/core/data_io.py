@@ -1,8 +1,8 @@
 """
 data_io.py
 
-Carga y filtrado de fijaciones desde los CSV de MECO L2, y normalización
-intra-sesión de PS (z-score por sesión).
+Carga y filtrado de fijaciones desde los CSV preprocesados (.clean.csv)
+de MECO L2, y normalización intra-sesión de PS (z-score o robust z-score).
 """
 
 import csv
@@ -10,16 +10,18 @@ import os
 from collections import defaultdict
 
 import numpy as np
+from scipy.stats import median_abs_deviation
 
 from .paths import resolve_wave_paths
 
 
-def load_fixations(filepath, wave, uniform_id=None, lang=None, trialid=None):
+def load_fixations(filepath, wave, uniform_id=None, lang=None, trialid=None, itemid=None):
     """
-    Carga y filtra las fijaciones del dataset CSV en una sola pasada de streaming.
+    Carga y filtra las fijaciones del CSV preprocesado (.clean.csv).
 
-    Retorna una lista de diccionarios con los campos necesarios para construir
-    la red de carga cognitiva, etiquetados con la ola de origen.
+    Solo carga filas donde ps > 0 (ya garantizado por preprocesamiento).
+    Retorna una lista de diccionarios con los campos necesarios para
+    construir la red de carga cognitiva.
     """
     if not os.path.exists(filepath):
         raise FileNotFoundError(f"No se encontró el archivo: {filepath}")
@@ -28,15 +30,18 @@ def load_fixations(filepath, wave, uniform_id=None, lang=None, trialid=None):
     with open(filepath, "r", encoding="utf-8", errors="ignore") as f:
         reader = csv.DictReader(f)
         for row in reader:
-            uid = row.get("uniform_id") or row.get("subid")
+            uid = row.get("uniform_id_clean") or row.get("uniform_id") or row.get("subid")
             row_lang = row.get("lang")
             tid = row.get("trialid")
+            row_itemid = row.get("itemid")
 
             if uniform_id and uid != uniform_id:
                 continue
             if lang and row_lang != lang:
                 continue
             if trialid and str(tid) != str(trialid):
+                continue
+            if itemid and str(row_itemid) != str(itemid):
                 continue
 
             try:
@@ -51,7 +56,7 @@ def load_fixations(filepath, wave, uniform_id=None, lang=None, trialid=None):
                 continue
 
             word_text = row.get("word") or row.get("ia") or f"Word_{wordnum}"
-            sentnum_raw = row.get("sentnum", "1")
+            sentnum_raw = row.get("sentnum_clean", row.get("sentnum", "1"))
             try:
                 sentnum = int(float(sentnum_raw))
             except (ValueError, TypeError):
@@ -61,6 +66,9 @@ def load_fixations(filepath, wave, uniform_id=None, lang=None, trialid=None):
                 ps = float(row.get("ps", 0)) if row.get("ps") else 0.0
             except (ValueError, TypeError):
                 ps = 0.0
+
+            if ps <= 0:
+                continue
 
             fixations.append(
                 {
@@ -82,16 +90,15 @@ def load_fixations(filepath, wave, uniform_id=None, lang=None, trialid=None):
 
 
 def load_all_fixations(
-    wave, uniform_id=None, lang=None, trialid=None, normalize="zscore"
+    wave, uniform_id=None, lang=None, trialid=None, itemid=None, normalize="zscore"
 ):
     """
     Carga y concatena fijaciones de la(s) ola(s) solicitada(s).
 
-    Si normalize='zscore' (default), cada sesión recibe un z-score por
-    observación: z = (ps − μ_session) / σ_session.  Esto es 0 en el
-    promedio de la sesión, +1 a una desviación estándar por encima (estrés
-    elevado), −1 a una por debajo.  Cuando normalize='none' se conserva
-    el PS crudo.
+    normalize puede ser:
+      - 'zscore': z-score clásico (mean/std) por sesión.
+      - 'robust': z-score robusto (median/MAD) por sesión.
+      - 'none': PS crudo sin normalizar.
 
     Devuelve la lista combinada y la lista de rutas de origen.
     """
@@ -102,12 +109,17 @@ def load_all_fixations(
         print(f"--> Cargando fijaciones desde: {p}")
         all_fix.extend(
             load_fixations(
-                p, wave=w, uniform_id=uniform_id, lang=lang, trialid=trialid
+                p, wave=w, uniform_id=uniform_id, lang=lang, trialid=trialid, itemid=itemid
             )
         )
     print(f"--> Total de fijaciones cargadas: {len(all_fix)}")
+
     if normalize == "zscore":
-        all_fix = normalize_session_ps(all_fix)
+        all_fix = normalize_session_ps(all_fix, method="zscore")
+        for f in all_fix:
+            f["has_z"] = True
+    elif normalize == "robust":
+        all_fix = normalize_session_ps(all_fix, method="robust")
         for f in all_fix:
             f["has_z"] = True
     elif normalize == "none":
@@ -115,14 +127,17 @@ def load_all_fixations(
             f["ps_z"] = 0.0
             f["has_z"] = False
     else:
-        raise ValueError(f"normalize debe ser 'zscore' o 'none', got {normalize!r}")
+        raise ValueError(f"normalize debe ser 'zscore', 'robust' o 'none', got {normalize!r}")
     return all_fix, paths
 
 
-def normalize_session_ps(fixations):
+def normalize_session_ps(fixations, method="zscore"):
     """
-    Aplica z-score por sesión a cada valor de `ps` y guarda el resultado
-    en el campo `ps_z` de cada fijación. El campo `ps` original se conserva.
+    Aplica normalización por sesión a cada valor de `ps` y guarda el
+    resultado en el campo `ps_z`.
+
+    method='zscore': z = (ps - mean) / std
+    method='robust': z = (ps - median) / (0.6745 * MAD)
     """
     by_session = defaultdict(list)
     for f in fixations:
@@ -136,8 +151,15 @@ def normalize_session_ps(fixations):
             for f in items:
                 f["ps_z"] = 0.0
             continue
-        mu = float(np.mean(ps_values))
-        sigma = float(np.std(ps_values, ddof=0))
+
+        if method == "robust":
+            mu = float(np.median(ps_values))
+            mad = float(median_abs_deviation(ps_values, nan_policy="omit"))
+            sigma = 0.6745 * mad
+        else:
+            mu = float(np.mean(ps_values))
+            sigma = float(np.std(ps_values, ddof=0))
+
         for f in items:
             if f["ps"] > 0 and sigma > 0:
                 f["ps_z"] = (f["ps"] - mu) / sigma
@@ -148,11 +170,8 @@ def normalize_session_ps(fixations):
 
 def load_fixations_from_cache_metadata(path, wave, metadata):
     """
-    Recarga fijaciones desde el CSV original aplicando los mismos filtros
+    Recarga fijaciones desde el CSV preprocesado aplicando los mismos filtros
     declarados en metadata.json (subid, lang, trialid).
-
-    Devuelve lista vacía si el archivo no existe, a diferencia de
-    load_fixations que lanza FileNotFoundError.
     """
     if not os.path.exists(path):
         return []
@@ -168,12 +187,5 @@ def load_fixations_from_cache_metadata(path, wave, metadata):
 def _session_key(fix, groupby):
     """
     Define la clave de sesión usada para construir aristas y normalizar PS.
-
-    La construcción de aristas siempre parte de sesiones individuales por
-    participante, de modo que `count` y `n_sessions` reflejen cuántas
-    observaciones reales (por participante) apoyan cada transición. El
-    parámetro `groupby` se preserva en los metadatos pero no afecta el
-    conteo de aristas: la agregación por L1 o por participante se obtiene
-    filtrando los datos de antemano con --lang o --subid.
     """
     return (fix["uniform_id"], fix["lang"], fix["trialid"], fix["wave"])

@@ -63,7 +63,7 @@ def visualize_network_interactive(G, build_dir, prefix):
 
     # --- edge color: coolwarm on mean_dps ---
     dps_arr = np.array(
-        [d.get("mean_dps", 0.0) for _, _, d in G.edges(data=True)], dtype=float
+        [d.get("mean_dps_abs", d.get("mean_dps", 0.0)) for _, _, d in G.edges(data=True)], dtype=float
     )
     if dps_arr.size:
         dmin, dmax = float(dps_arr.min()), float(dps_arr.max())
@@ -164,12 +164,12 @@ def visualize_network_interactive(G, build_dir, prefix):
             f'<span>{d.get("type", "forward")}</span>'
             f'<span style="{node_card_label_css}">count</span>'
             f'<span>{d.get("count", 0)} (sessions={d.get("n_sessions", 0)})</span>'
-            f'<span style="{node_card_label_css}">mean_dps</span>'
-            f'<span>{d.get("mean_dps", 0.0):.2f}</span>'
+            f'<span style="{node_card_label_css}">mean_dps_abs</span>'
+            f'<span>{d.get("mean_dps_abs", d.get("mean_dps", 0.0)):.2f}</span>'
             f'</div>'
             f'</div>'
         )
-        t = (d.get("mean_dps", 0.0) - dmin) / drange
+        t = (d.get("mean_dps_abs", d.get("mean_dps", 0.0)) - dmin) / drange
         net.add_edge(
             u,
             v,
