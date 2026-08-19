@@ -90,14 +90,16 @@ def export_cogload_report(
     with open(e_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(
-            ["source", "target", "mean_dps", "count", "n_sessions", "type"]
+            ["source", "target", "mean_dps_abs", "mean_dps_signed", "weight", "count", "n_sessions", "type"]
         )
         for u, v, d in G.edges(data=True):
             w.writerow(
                 [
                     u,
                     v,
-                    round(d.get("mean_dps", 0.0), 4),
+                    round(d.get("mean_dps_abs", d.get("mean_dps", 0.0)), 4),
+                    round(d.get("mean_dps_signed", 0.0), 4),
+                    round(d.get("weight", d.get("mean_dps", 0.0)), 4),
                     d.get("count", 0),
                     d.get("n_sessions", 0),
                     d.get("type", "forward"),

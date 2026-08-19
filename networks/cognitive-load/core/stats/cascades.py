@@ -89,7 +89,7 @@ def detect_cognitive_load_cascades(
         else:
             peaks = [int(p) for p in peak_idx if z_norm[p] > z_thresh and p < len(means) - window]
 
-        edge_mode = G.graph.get("edge_mode", "sequential") if G is not None else "sequential"
+        edge_mode = G.graph.get("edge_mode", "temporal") if G is not None else "temporal"
 
         for p in peaks:
             baseline = smoothed[max(0, p - 3):p]
@@ -134,13 +134,11 @@ def _cascade_propagation_depth(G, sent_peak, wordnum_peak, post_signal, ordered_
     Para una cascada confirmada, busca la profundidad (en saltos de aristas)
     más pequeña desde el pico hasta una palabra cuya signal esté por encima
     de la línea base (o, en su defecto, por encima de la media del post).
-    Sólo se evalúa en grafos edge-mode=window, donde las aristas forward+k
-    hacen la distancia de propagación literal.
 
     Retorna -1 si no hay un destino cuyo signal cruce el umbral o si el
-    grafo no está en modo window.
+    grafo no tiene aristas.
     """
-    if G is None or G.graph.get("edge_mode") != "window":
+    if G is None or G.number_of_edges() == 0:
         return -1
 
     peak_id = None
