@@ -7,9 +7,17 @@
 
 *.csv
 *.rds
+data/
 
+validation.py
 validation/
+
 plots/
+networks/comprehension/
+networks/comp-groups/
+networks/word-types/
+networks/saccade/
+analysis/*/output/
 
 __pycache__/
 *.pyc
