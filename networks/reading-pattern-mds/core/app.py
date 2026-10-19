@@ -21,19 +21,28 @@ from datetime import datetime, timezone
 
 import pandas as pd
 
-from . import distances, paths, profiles, viz
+from . import distances, lingdistance, paths, profiles, viz
 
 
-def build_all(mode: str) -> dict:
-    meta = {"profiles": {}, "mode": mode, "generated": datetime.now(timezone.utc).isoformat()}
-    full_df, quart_df = profiles.build_profiles(mode, meta)
+def _calculate_and_save_native_distances(
+    mode: str,
+    full_df: pd.DataFrame,
+    quart_df: pd.DataFrame,
+    D_full: pd.DataFrame,
+    D_quart: pd.DataFrame,
+) -> pd.DataFrame:
     langs = paths.target_langs()
 
-    D_full = distances.pairwise_js_matrix(full_df, list(full_df.index))
-    distances.save_distance_matrix(D_full, "full_all", mode)
-
-    D_quart = distances.pairwise_js_matrix(quart_df, list(quart_df.index))
-    distances.save_distance_matrix(D_quart, "quartile_all", mode)
+    # Precalcular accuracy de referencias nativas
+    ref_accs: dict[tuple[str, str | None], dict[str, float]] = {}
+    for session in ("L1", "L2"):
+        for quart in (None, "Q1", "Q4"):
+            ref_accs[(session, quart)] = {}
+            for ref, ref_code in paths.EN_REFS.items():
+                try:
+                    ref_accs[(session, quart)][ref] = profiles.condition_accuracy(session, ref_code, quart)
+                except Exception:
+                    pass
 
     # distancias de cada grupo a los cohortes nativos (misma sesión / mismo cuartil)
     rows = []
@@ -49,8 +58,59 @@ def build_all(mode: str) -> dict:
                     refc = f"{session}-{ref_code}" + (f"-{quart}" if quart else "")
                     if refc in D.columns:
                         row[f"jsd_{ref}"] = round(float(D.loc[base, refc]), 4)
+
+                dm = [row[f"jsd_{ref}"] for ref in paths.EN_REFS if f"jsd_{ref}" in row]
+                if dm:
+                    row["jsd_mean"] = round(sum(dm) / len(dm), 4)
+                    row["closeness_mean"] = round(1.0 - row["jsd_mean"], 4)
+
+                try:
+                    acc_stats = profiles.condition_accuracy_stats(session, lang, quart)
+                    row["accuracy"] = round(acc_stats["mean"], 4)
+                    row["accuracy_std"] = round(acc_stats["std"], 4)
+                    row["n_subjects"] = acc_stats["n"]
+                except Exception:
+                    pass
+
+                for ref, r_acc in ref_accs.get((session, quart), {}).items():
+                    row[f"acc_{ref}"] = round(r_acc, 4)
+
                 rows.append(row)
-    pd.DataFrame(rows).to_csv(paths.distances_dir(mode) / "distance_to_native.csv", index=False)
+    df_out = pd.DataFrame(rows)
+    paths.ensure_dirs(mode)
+    df_out.to_csv(paths.distances_dir(mode) / "distance_to_native.csv", index=False)
+
+    # Tablas de distancia lingüística y accuracy de comprensión
+    lingdistance.save_table(mode)
+    lingdistance.save_accuracy_table(mode)
+    lingdistance.correlations(mode)
+    lingdistance.comprehension_correlations(mode)
+    return df_out
+
+
+def update_distances_and_accuracies(mode: str) -> pd.DataFrame:
+    """Actualiza distance_to_native.csv y tablas de correlación reusando los perfiles existentes."""
+    paths.ensure_dirs(mode)
+    full_df = pd.read_csv(paths.profiles_dir(mode) / "profiles_full.csv", index_col=0)
+    quart_df = pd.read_csv(paths.profiles_dir(mode) / "profiles_quartile.csv", index_col=0)
+    D_full = distances.pairwise_js_matrix(full_df, list(full_df.index))
+    distances.save_distance_matrix(D_full, "full_all", mode)
+    D_quart = distances.pairwise_js_matrix(quart_df, list(quart_df.index))
+    distances.save_distance_matrix(D_quart, "quartile_all", mode)
+    return _calculate_and_save_native_distances(mode, full_df, quart_df, D_full, D_quart)
+
+
+def build_all(mode: str) -> dict:
+    meta = {"profiles": {}, "mode": mode, "generated": datetime.now(timezone.utc).isoformat()}
+    full_df, quart_df = profiles.build_profiles(mode, meta)
+
+    D_full = distances.pairwise_js_matrix(full_df, list(full_df.index))
+    distances.save_distance_matrix(D_full, "full_all", mode)
+
+    D_quart = distances.pairwise_js_matrix(quart_df, list(quart_df.index))
+    distances.save_distance_matrix(D_quart, "quartile_all", mode)
+
+    _calculate_and_save_native_distances(mode, full_df, quart_df, D_full, D_quart)
 
     meta["n_profiles_full"] = int(D_full.shape[0])
     meta["n_profiles_quartile"] = int(D_quart.shape[0])

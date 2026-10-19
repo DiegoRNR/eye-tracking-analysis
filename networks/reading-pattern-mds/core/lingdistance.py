@@ -76,10 +76,13 @@ def _read_native_distances(mode: str) -> pd.DataFrame:
     df = pd.read_csv(paths.distances_dir(mode) / "distance_to_native.csv")
     df = df[df["lang"] != "en"]  # en/es refs por si acaso (target langs only table inputs)
     df = df[~df["lang"].isin(paths.EN_REFS.values())]
-    df["jsd_mean"] = df[[c for c in ("jsd_en_ca", "jsd_en_uk") if c in df.columns]].mean(axis=1)
+    if "jsd_mean" not in df.columns:
+        df["jsd_mean"] = df[[c for c in ("jsd_en_ca", "jsd_en_uk") if c in df.columns]].mean(axis=1)
+    if "closeness_mean" not in df.columns:
+        df["closeness_mean"] = 1.0 - df["jsd_mean"]
     ling = load_distances()
     df["ling_distance"] = df["lang"].map(ling)
-    return df.dropna(subset=["ling_distance", "jsd_mean"])
+    return df
 
 
 def correlations(mode: str) -> pd.DataFrame:
@@ -89,7 +92,7 @@ def correlations(mode: str) -> pd.DataFrame:
     """
     from scipy import stats
 
-    df = _read_native_distances(mode)
+    df = _read_native_distances(mode).dropna(subset=["ling_distance", "jsd_mean"])
     rows = []
     for session in ("L1", "L2"):
         for quartile in ("all", "Q1", "Q4"):
@@ -119,4 +122,70 @@ def correlations(mode: str) -> pd.DataFrame:
     out = pd.DataFrame(rows)
     paths.ensure_dirs(mode)
     out.to_csv(paths.distances_dir(mode) / "corr_linguistic_reading.csv", index=False)
+    return out
+
+
+def comprehension_correlations(mode: str) -> pd.DataFrame:
+    """
+    Correlación accuracy de comprensión ↔ distancia y cercanía de lectura a nativos.
+    Una fila por (session, quartile, aggregate); retorna tabla y la guarda en
+    distances/corr_comprehension_reading.csv.
+    """
+    from scipy import stats
+
+    df = _read_native_distances(mode)
+    if "accuracy" not in df.columns:
+        return pd.DataFrame()
+    df = df.dropna(subset=["accuracy", "jsd_mean"])
+    rows = []
+    for session in ("L1", "L2"):
+        for quartile in ("all", "Q1", "Q4"):
+            sub = df[(df["session"] == session) & (df["quartile"] == quartile)]
+            if len(sub) < 5:
+                continue
+            x = sub["accuracy"]
+            for agg in ("mean", "en_ca", "en_uk"):
+                ycol = "jsd_mean" if agg == "mean" else f"jsd_{agg}"
+                if ycol not in sub.columns:
+                    continue
+                y_dist = sub[ycol]
+                y_close = 1.0 - y_dist
+
+                pr_dist, pp_dist = stats.pearsonr(x, y_dist)
+                sr_dist, sp_dist = stats.spearmanr(x, y_dist)
+                pr_close, pp_close = stats.pearsonr(x, y_close)
+                sr_close, sp_close = stats.spearmanr(x, y_close)
+
+                rows.append(
+                    {
+                        "session": session,
+                        "quartile": quartile,
+                        "aggregate": agg,
+                        "n": len(sub),
+                        # Distancia (J-S): correlación negativa indica acercamiento
+                        "pearson_r_dist": round(float(pr_dist), 4),
+                        "pearson_p_dist": round(float(pp_dist), 4),
+                        "spearman_rho_dist": round(float(sr_dist), 4),
+                        "spearman_p_dist": round(float(sp_dist), 4),
+                        # Cercanía (1 - J-S): correlación positiva indica acercamiento
+                        "pearson_r_closeness": round(float(pr_close), 4),
+                        "pearson_p_closeness": round(float(pp_close), 4),
+                        "spearman_rho_closeness": round(float(sr_close), 4),
+                        "spearman_p_closeness": round(float(sp_close), 4),
+                    }
+                )
+    out = pd.DataFrame(rows)
+    paths.ensure_dirs(mode)
+    out.to_csv(paths.distances_dir(mode) / "corr_comprehension_reading.csv", index=False)
+    return out
+
+
+def save_accuracy_table(mode: str) -> pd.DataFrame:
+    """Exporta tabla de accuracy de comprensión por grupo y condición."""
+    df = pd.read_csv(paths.distances_dir(mode) / "distance_to_native.csv")
+    cols = [c for c in ("lang", "session", "quartile", "accuracy", "accuracy_std", "n_subjects", "acc_en_ca", "acc_en_uk") if c in df.columns]
+    out = df[cols].copy()
+    paths.ensure_dirs(mode)
+    out_path = paths.distances_dir(mode) / "lang_comprehension_accuracy.csv"
+    out.to_csv(out_path, index=False)
     return out

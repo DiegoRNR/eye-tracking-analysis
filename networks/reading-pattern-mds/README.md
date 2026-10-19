@@ -47,11 +47,22 @@ navegador; plotly.js via CDN) con los DOS modos embebidos:
   condiciones; el filtrado solo oculta/muestra puntos, subsets comparables).
   Filtros: lengua (checkboxes + buscador), sesión L1/L2, cuartiles
   (todos | Q1 | Q4 | Q1+Q4), cohortes nativos en_ca/en_uk, líneas de enlace,
-  etiquetas, y color **por lengua** o **por distancia lingüística**. Hover con
-  las distancias J-S a nativos y la distancia lingüística.
+  etiquetas, y color **por lengua**, **por distancia lingüística** o **por comprensión lectora**.
+  Hover con las distancias J-S a nativos, cercanía nativa (`1 - JSD`), comprensión (%) y distancia lingüística.
+- **Comprensión vs Lectura**: x = accuracy de comprensión (%), y = cercanía a nativos (`1 - JSD`) o distancia J-S, con línea OLS + estadísticas Pearson/Spearman en vivo (`corr_comprehension_reading.csv`).
 - **Distancia lingüística**: x = lang_to_en.csv, y = J-S de lectura (media de
   cohortes | en_ca | en_uk), línea OLS + Pearson/Spearman del corte visible.
 - **Info**: descripción del método.
+
+## Comprensión lectora y cercanía a nativos
+
+Accuracy de comprensión agregada por grupo, sesión y cuartil (`lang_comprehension_accuracy.csv`) contrastada contra la cercanía (`1 - JSD`) y distancia (`JSD`) a lectores nativos de inglés (`corr_comprehension_reading.csv`).
+
+Resultados clave (modo `temporal`, media de cohortes nativos):
+
+- **L2 (lectura en inglés): r = +0.43, p = 0.029 (Spearman ρ = 0.41, p = 0.035)** — grupos con mayor comprensión lectora en inglés adoptan patrones de transición visual significativamente más cercanos a los nativos de inglés.
+- **L2 Cuartil bajo (Q1): r = +0.59, p = 0.0015** — el efecto es aún más pronunciado entre los lectores con mayores dificultades en L2.
+- **L1 (lectura nativa): r = -0.12, p = 0.557 (no significativo)** — la habilidad lectora general en su propia lengua no predice cercanía al patrón inglés, confirmando que la cercanía es un marcador específico de competencia en L2.
 
 ## Distancia lingüística al inglés
 
@@ -74,13 +85,16 @@ resultados clave (temporal, media de cohortes):
 ## Salidas (`output/<mode>/`)
 
 ```
-profiles/profiles_full.csv        # condición × arista (grupo completo, sin cuartiles)
-profiles/profiles_quartile.csv    # ídem con división Q1/Q4 (p25/p75, centro fuera)
-distances/dist_full_all.csv       # matriz J-S entre TODAS las condiciones full
-distances/dist_quartile_all.csv   # ídem Q1/Q4
-distances/distance_to_native.csv  # J-S de cada grupo a en_ca/en_uk (misma sesión/cuartil)
-distances/embeddings.csv          # coordenadas MDS por figura
-figures/*.png                     # figuras MDS (ver abajo)
+profiles/profiles_full.csv              # condición × arista (grupo completo, sin cuartiles)
+profiles/profiles_quartile.csv          # ídem con división Q1/Q4 (p25/p75, centro fuera)
+distances/dist_full_all.csv             # matriz J-S entre TODAS las condiciones full
+distances/dist_quartile_all.csv         # ídem Q1/Q4
+distances/distance_to_native.csv        # J-S, cercanía (1-JSD) y accuracy de cada grupo a nativos
+distances/lang_comprehension_accuracy.csv # accuracy por grupo, sesión y cuartil
+distances/corr_comprehension_reading.csv  # correlación comprensión ↔ cercanía/distancia a nativos
+distances/corr_linguistic_reading.csv   # correlación distancia lingüística ↔ lectura
+distances/embeddings.csv                # coordenadas MDS por figura
+figures/*.png                           # figuras MDS
 ```
 
 ### Variantes de figuras (spec del usuario)

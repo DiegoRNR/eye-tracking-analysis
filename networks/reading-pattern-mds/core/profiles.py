@@ -35,6 +35,35 @@ def _subjects_for(session: str, lang: str, quartile: Optional[str]) -> list[str]
     return sorted(u for u, q in groups.items() if q == quartile)
 
 
+def condition_accuracy(session: str, lang: str, quartile: Optional[str] = None) -> float:
+    """Accuracy media de comprensión de los sujetos de la condición."""
+    data_io, _, grouping, _, _ = shared()
+    acc = data_io.load_accuracy(session, lang)
+    if quartile is None:
+        return float(acc.mean())
+    groups, gsum = grouping.quartile_groups(acc)
+    if not gsum.get("split"):
+        return float(acc.mean())
+    sub = acc[[u for u, q in groups.items() if q == quartile]]
+    return float(sub.mean()) if len(sub) > 0 else float(acc.mean())
+
+
+def condition_accuracy_stats(session: str, lang: str, quartile: Optional[str] = None) -> dict:
+    """Estadísticas de comprensión (mean, std, median, n) para la condición."""
+    data_io, _, grouping, _, _ = shared()
+    acc = data_io.load_accuracy(session, lang)
+    if quartile is not None:
+        groups, gsum = grouping.quartile_groups(acc)
+        if gsum.get("split"):
+            acc = acc[[u for u, q in groups.items() if q == quartile]]
+    return {
+        "mean": float(acc.mean()) if len(acc) > 0 else 0.0,
+        "std": float(acc.std(ddof=1)) if len(acc) > 1 else 0.0,
+        "median": float(acc.median()) if len(acc) > 0 else 0.0,
+        "n": int(len(acc)),
+    }
+
+
 def condition_transition_counts(
     session: str, lang: str, mode: str, quartile: Optional[str] = None
 ) -> Counter:
