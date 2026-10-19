@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Scanpath networks — dashboard</title>
+<script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+<style>
+ :root { --bg:#fafafa; --panel:#ffffff; --border:#ddd; }
+ * { box-sizing:border-box; }
+ body { margin:0; font:13px/1.45 -apple-system, "Segoe UI", sans-serif; background:var(--bg); display:flex; height:100vh; }
+ aside { width:280px; min-width:280px; background:var(--panel); border-right:1px solid var(--border); overflow-y:auto; padding:12px; }
+ main { flex:1; display:flex; flex-direction:column; min-width:0; }
+ h4 { margin:12px 0 4px; font-size:12.5px; text-transform:uppercase; letter-spacing:.04em; color:#555; }
+ select, input[type=text] { font-size:13px; width:100%; }
+ label { user-select:none; cursor:pointer; display:block; padding:1px 3px; border-radius:4px; }
+ label:hover { background:#f2f2f2; }
+ input[type=radio], input[type=checkbox] { margin:0 4px 0 0; }
+ #plot { flex:1; min-height:0; }
+ #animctrl { display:flex; gap:8px; align-items:center; padding:6px 12px; background:var(--panel); border-top:1px solid var(--border); }
+ #animctrl.hidden { display:none; }
+ #play { flex:0 0 46px; cursor:pointer; }
+ #speed { width:70px; }
+ #range { flex:1; }
+ #progress { width:52px; text-align:right; color:#555; }
+ #note { padding:4px 12px; font-size:12px; color:#444; border-top:1px solid var(--border); background:var(--panel); max-height:110px; overflow-y:auto; }
+ #catlegend { display:flex; flex-wrap:wrap; gap:3px 8px; font-size:11.5px; }
+ .legend-item { display:inline-flex; align-items:center; gap:3px; }
+ .swatch { width:10px; height:10px; border-radius:2px; display:inline-block; }
+ #langinfo { color:#777; font-size:12px; margin-top:2px; }
+ #infosection { font-size:11.5px; color:#555; }
+</style>
+</head>
+<body>
+<aside>
+  <h4>Grano</h4>
+  <select id="grain">
+    <option value="w">Palabra (mapa de lectura)</option>
+    <option value="t">Tipo de palabra (muelle)</option>
+  </select>
+  <h4>Lengua</h4>
+  <select id="lang"></select>
+  <div id="langinfo"></div>
+  <h4>Texto</h4>
+  <select id="text"></select>
+  <h4>Cuartil</h4>
+  <label><input type="radio" name="q" value="Q1" checked> Q1 (cuartil bajo)</label>
+  <label><input type="radio" name="q" value="Q4"> Q4 (cuartil alto)</label>
+  <h4>Vista</h4>
+  <label><input type="radio" name="mode" value="static" checked> estática</label>
+  <label><input type="radio" name="mode" value="anim"> animada (primera travesía)</label>
+  <h4>Aristas</h4>
+  <label><input type="checkbox" id="f-fwd" checked> avance</label>
+  <label><input type="checkbox" id="f-reg" checked> regresiones</label>
+  <h4>Nodos</h4>
+  <label><input type="checkbox" id="f-labels" checked> etiquetas</label>
+  <h4>Leyenda (tipos)</h4>
+  <div id="catlegend"></div>
+  <h4>Info</h4>
+  <div id="infosection">
+   <b>Palabra:</b> nodos = palabras del texto en posición de lectura (x: dentro
+   de la oración, y: oración). Color = ps media (viridis; gris = sin ps);
+   tamaño = fijaciones. La etiqueta en hover muestra la duración media (ms).
+   Arista azul = avance, roja = regresión; grosor = n pooled del cuartil.
+   Refijaciones consecutivas no generan arista.<br><br>
+   <b>Tipo:</b> las mismas transiciones agregadas entre categorías gramaticales
+   (<i>categoria_gramatical</i>, words_classified.csv). Layout de muelle
+   determinista (networkx spring, seed 42). El color de la arista sigue la
+   dirección dominante (avance azul / regresión roja).
+  </div>
+</aside>
+<main>
+  <div id="plot"></div>
+  <div id="animctrl" class="hidden">
+    <button id="play">▶</button>
+    <input type="range" id="range" min="0" max="1000" value="0">
+    <select id="speed">
+      <option value="0.6">lento</option>
+      <option value="0.25" selected>normal</option>
+      <option value="0.12">rápido</option>
+    </select>
+    <span id="progress">0%</span>
+  </div>
+  <div id="note"></div>
+</main>
+<script>
+const DATA = __DATA__;
+
+const CAT_COLORS = {
+  "Sustantivo": "#4c72b0", "Verbo": "#c44e52", "Adjetivo": "#55a868",
+  "Adverbio": "#dd8452", "Preposición": "#8172b3", "Artículo": "#937860",
+  "Conjunción": "#da8bc3", "Pronombre": "#8c8c8c", "Numeral": "#ccb974",
+  "Determinante": "#64b5cd", "Partícula": "#cab2d6", "Otro": "#bbbbbb",
+};
+const EDGE_COLORS = { fwd: "#3498db", reg: "#e74c3c" };
+
+const state = { animating: false, tpos: 0, timer: null };
+
+// --- datos -----------------------------------------------------------------
+const langs = Object.keys(DATA.langs).sort();
+const textsAll = Array.from(new Set(
+  Object.keys(DATA.cells).map(k => +k.split("|")[2])
+)).sort((a, b) => a - b);
+
+function qval() { return document.querySelector('input[name=q]:checked').value; }
+function isAnim() { return document.querySelector('input[name=mode]:checked').value === "anim"; }
+function key() {
+  return document.getElementById("lang").value + "|" + qval() + "|" +
+    document.getElementById("text").value;
+}
+function cell() {
+  return (document.getElementById("grain").value === "w" ? DATA.cells : DATA.tcells)[key()] || null;
+}
+function textsFor(lang, q) {
+  return textsAll.filter(tn => DATA.cells[lang + "|" + q + "|" + tn] !== undefined);
+}
+
+// --- inicialización de selects ---------------------------------------------
+function init() {
+  const selL = document.getElementById("lang");
+  selL.innerHTML = "";
+  langs.forEach(l => {
+    const o = document.createElement("option");
+    o.value = l;
+    o.textContent = l + "  (Q1 n=" + DATA.langs[l].n_Q1 + " · Q4 n=" + DATA.langs[l].n_Q4 + ")";
+    selL.appendChild(o);
+  });
+  selL.value = langs.includes("en") ? "en" : (langs[0] || "");
+  updateLangInfo();
+
+  const box = document.getElementById("catlegend");
+  box.innerHTML = "";
+  DATA.cats.forEach(c => {
+    const d = document.createElement("span");
+    d.className = "legend-item";
+    d.innerHTML = '<span class="swatch" style="background:' + (CAT_COLORS[c] || "#999") +
+      '"></span>' + c;
+    box.appendChild(d);
+  });
+  updateTexts();
+  draw();
+}
+function updateLangInfo() {
+  const m = DATA.langs[document.getElementById("lang").value];
+  document.getElementById("langinfo").textContent =
+    m ? "acc p25=" + m.q25 + " · p75=" + m.q75 : "";
+}
+function updateTexts() {
+  const lang = document.getElementById("lang").value;
+  const sel = document.getElementById("text");
+  const prev = sel.value;
+  const tns = textsFor(lang, qval());
+  sel.innerHTML = "";
+  tns.forEach(tn => {
+    const o = document.createElement("option");
+    o.value = tn; o.textContent = "texto " + tn;
+    sel.appendChild(o);
+  });
+  if (tns.includes(+prev)) sel.value = prev;
+}
+
+// --- helpers ---------------------------------------------------------------
+function edgeWidth(c, cmax) { return 1.0 + 5.2 * (Math.log1p(c) / Math.log1p(cmax || 1)); }
+function edgeOpacity(c, cmax) { return 0.18 + 0.55 * (Math.log1p(c) / Math.log1p(cmax || 1)); }
+
+// --- dibujo ----------------------------------------------------------------
+function draw() {
+  const c = cell();
+  const note = document.getElementById("note");
+  document.getElementById("animctrl").classList.toggle("hidden", !isAnim());
+  if (!c) {
+    Plotly.purge("plot");
+    note.innerHTML = "sin datos para esta selección";
+    return;
+  }
+  if (document.getElementById("grain").value === "w") drawWord(c, note);
+  else drawType(c, note);
+}
+
+// filtro común por tipo de arista y modo animado
+function filterEdges(edges, anim, tpos, showF, showR, isRegOf) {
+  return edges.filter(e => {
+    const reg = isRegOf(e);
+    if ((reg && !showR) || (!reg && !showF)) return false;
+    if (anim && (e.st == null || e.st > tpos)) return false;
+    return true;
+  });
+}
+
+function drawWord(c, note) {
+  const nodes = c.nodes, edges = c.edges;
+  const fixmax = Math.max.apply(null, nodes.map(nd => nd[3])) || 1;
+  const psvals = nodes.filter(nd => nd[4] != null).map(nd => nd[4]);
+  const psmin = psvals.length ? Math.min.apply(null, psvals) : 0;
+  const psmax = psvals.length ? Math.max.apply(null, psvals) : psmin + 1;
+  const anim = isAnim(), tpos = state.tpos, flash = 0.035;
+  const showF = document.getElementById("f-fwd").checked;
+  const showR = document.getElementById("f-reg").checked;
+  const showLabels = document.getElementById("f-labels").checked;
+
+  const isReg = e => nodes[e[0]][1] > nodes[e[1]][1];
+  const vis = edges.map(e => ({ iu: e[0], iv: e[1], cnt: e[2], st: e[3], ref: isReg(e) }))
+    .filter(e => filterEdges([e], anim, tpos, showF, showR, x => x.ref).length);
+  const cmax = Math.max.apply(null, edges.map(e => e[2])) || 1;
+
+  function traceLines(wanted) {
+    const es = vis.filter(e => e.ref === wanted);
+    if (!es.length) return null;
+    const xs = [], ys = [], widths = [], hover = [];
+    es.forEach(e => {
+      const a = nodes[e.iu], b = nodes[e.iv];
+      xs.push(a[6], b[6], null);
+      ys.push(a[7], b[7], null);
+      let w = edgeWidth(e.cnt, cmax), o = edgeOpacity(e.cnt, cmax);
+      if (anim && (tpos - e.st) < flash) { w *= 2.2; o = 1.0; }
+      widths.push(w);
+      hover.push("<b>" + a[0] + " → " + b[0] + "</b><br>palabra #" + a[1] +
+        " → #" + b[1] + "<br>n = " + e.cnt + (wanted ? " (regresión)" : "") +
+        (e.st != null ? "<br>1ª travesía: " + Math.round(e.st * 100) + "%" : ""));
+    });
+    return {
+      type: "scatter", mode: "lines", x: xs, y: ys,
+      line: { color: wanted ? EDGE_COLORS.reg : EDGE_COLORS.fwd, width: widths },
+      hoverinfo: "text", hovertext: hover, showlegend: false, connectgaps: false,
+    };
+  }
+  function traceArrows(wanted) {
+    const es = vis.filter(e => e.ref === wanted);
+    const xs = [], ys = [], angles = [], colors = [], sizes = [];
+    const col = wanted ? EDGE_COLORS.reg : EDGE_COLORS.fwd;
+    es.forEach(e => {
+      const a = nodes[e.iu], b = nodes[e.iv];
+      const dx = b[6] - a[6], dy = b[7] - a[7];
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 1) return;
+      xs.push(b[6] - dx / dist * 26);
+      ys.push(b[7] - dy / dist * 26);
+      angles.push(Math.atan2(-dy, dx) * 180 / Math.PI);  // eje y invertido
+      colors.push(col);
+      sizes.push(edgeWidth(e.cnt, cmax) * 2.4);
+    });
+    if (!xs.length) return null;
+    return {
+      type: "scatter", mode: "markers", x: xs, y: ys,
+      marker: { symbol: "arrow", angle: angles, size: sizes, color: colors },
+      hoverinfo: "skip", showlegend: false,
+    };
+  }
+  function nodeTrace(idxs, gray, plotNodes) {
+    if (!idxs.length) return null;
+    const nds = idxs.map(i => plotNodes[i]);
+    return {
+      type: "scatter",
+      mode: showLabels ? "markers+text" : "markers",
+      x: nds.map(nd => nd[6]), y: nds.map(nd => nd[7]),
+      text: nds.map(nd => nd[0]),
+      textposition: "top center", textfont: { size: showLabels ? 10 : 1, color: "#444" },
+      marker: gray ? {
+        size: nds.map(nd => 9 + 20 * (nd[3] / fixmax)),
+        color: "#f4f4f4", line: { color: "#9e9e9e", width: 1 },
+      } : {
+        size: nds.map(nd => 9 + 20 * (nd[3] / fixmax)),
+        color: nds.map(nd => nd[4]),
+        colorscale: "Viridis", cmin: psmin, cmax: psmax,
+        line: { color: "#37474f", width: 1 },
+        colorbar: { title: "ps media", thickness: 12, x: 1.02 },
+        showscale: true,
+      },
+      hovertext: nds.map(nd =>
+        "<b>" + nd[0] + "</b><br>palabra #" + nd[1] + " · oración " + nd[2] +
+        "<br>fijaciones: " + nd[3] + "<br>duración media: " + nd[5] + " ms" +
+        (nd[4] != null ? "<br>ps media: " + nd[4] : "")),
+      hovertemplate: "%{hovertext}<extra></extra>",
+      showlegend: false,
+    };
+  }
+
+  const grayIdx = [], psIdx = [];
+  nodes.forEach((nd, i) => (nd[4] == null ? grayIdx : psIdx).push(i));
+
+  const traces = [];
+  const tF = traceLines(false), tR = traceLines(true);
+  if (tF) traces.push(tF);
+  if (tR) traces.push(tR);
+  const aF = traceArrows(false), aR = traceArrows(true);
+  if (aF) traces.push(aF);
+  if (aR) traces.push(aR);
+  const gT = nodeTrace(grayIdx, true, nodes), pT = nodeTrace(psIdx, false, nodes);
+  if (gT) traces.push(gT);
+  if (pT) traces.push(pT);
+
+  const lang = document.getElementById("lang").value;
+  const layout = {
+    title: "Scanpath · palabra — " + lang + " · " + qval() + " · texto " + c.tn +
+      " (n=" + c.n + " · " + c.nt + " transiciones)" +
+      (anim ? " · animada " + Math.round(tpos * 100) + "%" : ""),
+    hovermode: "closest", margin: { t: 60, b: 40, l: 40, r: 10 },
+    xaxis: { zeroline: false, showgrid: false },
+    yaxis: { zeroline: false, showgrid: false, autorange: "reversed", scaleanchor: "x" },
+  };
+  Plotly.react("plot", traces, layout, { responsive: true, displaylogo: false });
+  note.innerHTML = "<b>Scanpath (palabra):</b> " + nodes.length + " palabras · " +
+    vis.length + " aristas visibles de " + edges.length + ". Arista " +
+    "<span style='color:" + EDGE_COLORS.fwd + "'>azul</span> = avance, " +
+    "<span style='color:" + EDGE_COLORS.reg + "'>roja</span> = regresión; " +
+    "grosor = n pooled. n = sujetos del cuartil " + qval() + " de " + lang +
+    " (textos L2 en inglés).";
+}
+
+function drawType(c, note) {
+  const nodes = c.nodes, edges = c.edges;
+  const fixmax = Math.max.apply(null, nodes.map(nd => nd[1])) || 1;
+  const anim = isAnim(), tpos = state.tpos, flash = 0.04;
+  const showF = document.getElementById("f-fwd").checked;
+  const showR = document.getElementById("f-reg").checked;
+  const showLabels = document.getElementById("f-labels").checked;
+
+  const vis = filterEdges(edges, anim, tpos, showF, showR, e => e[4] === 1);
+  const cmax = Math.max.apply(null, edges.map(e => e[2])) || 1;
+  const col = idx => idx ? EDGE_COLORS.reg : EDGE_COLORS.fwd;
+
+  function traceLines(wanted) {
+    const es = vis.filter(e => e[4] === wanted);
+    if (!es.length) return null;
+    const xs = [], ys = [], widths = [], hover = [];
+    es.forEach(e => {
+      const a = nodes[e[0]], b = nodes[e[1]];
+      xs.push(a[4], b[4], null);
+      ys.push(a[5], b[5], null);
+      let w = edgeWidth(e[2], cmax), o = edgeOpacity(e[2], cmax);
+      if (anim && (tpos - e[3]) < flash) { w *= 2.2; o = 1.0; }
+      widths.push(w);
+      hover.push("<b>" + a[0] + " → " + b[0] + "</b><br>n = " + e[2] +
+        (wanted ? " (regresión dominante)" : "") +
+        (e[3] != null ? "<br>1ª travesía: " + Math.round(e[3] * 100) + "%" : ""));
+    });
+    return {
+      type: "scatter", mode: "lines", x: xs, y: ys,
+      line: { color: col(wanted), width: widths },
+      hoverinfo: "text", hovertext: hover, showlegend: false, connectgaps: false,
+    };
+  }
+  function traceArrows(wanted) {
+    const es = vis.filter(e => e[4] === wanted);
+    const xs = [], ys = [], angles = [], colors = [], sizes = [];
+    es.forEach(e => {
+      const a = nodes[e[0]], b = nodes[e[1]];
+      const dx = b[4] - a[4], dy = b[5] - a[5];
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < 26) return;
+      xs.push(b[4] - dx / dist * 24);
+      ys.push(b[5] - dy / dist * 24);
+      angles.push(Math.atan2(-dy, dx) * 180 / Math.PI);
+      colors.push(col(wanted));
+      sizes.push(edgeWidth(e[2], cmax) * 2.6);
+    });
+    if (!xs.length) return null;
+    return {
+      type: "scatter", mode: "markers", x: xs, y: ys,
+      marker: { symbol: "arrow", angle: angles, size: sizes, color: colors },
+      hoverinfo: "skip", showlegend: false,
+    };
+  }
+
+  const nodeTrace = {
+    type: "scatter",
+    mode: showLabels ? "markers+text" : "markers",
+    x: nodes.map(nd => nd[4]), y: nodes.map(nd => nd[5]),
+    text: nodes.map(nd => nd[0]),
+    textposition: "bottom center",
+    textfont: { size: 10, color: "#333" },
+    marker: {
+      size: nodes.map(nd => 34 + 42 * (nd[1] / fixmax)),
+      color: nodes.map(nd => CAT_COLORS[nd[0]] || "#999"),
+      line: { color: "#333", width: 1 },
+    },
+    hovertext: nodes.map(nd =>
+      "<b>" + nd[0] + "</b><br>fijaciones: " + nd[1] +
+      (nd[2] != null ? "<br>ps media: " + nd[2] : "") +
+      "<br>palabras distintas: " + nd[3]),
+    hovertemplate: "%{hovertext}<extra></extra>",
+    showlegend: false,
+  };
+
+  const traces = [];
+  const tF = traceLines(0), tR = traceLines(1);
+  if (tF) traces.push(tF);
+  if (tR) traces.push(tR);
+  const aF = traceArrows(0), aR = traceArrows(1);
+  if (aF) traces.push(aF);
+  if (aR) traces.push(aR);
+  traces.push(nodeTrace);
+
+  const lang = document.getElementById("lang").value;
+  const layout = {
+    title: "Scanpath · tipo de palabra — " + lang + " · " + qval() + " · texto " + c.tn +
+      " (n=" + c.n + " · " + c.nt + " transiciones tipo→tipo)" +
+      (anim ? " · animada " + Math.round(tpos * 100) + "%" : ""),
+    hovermode: "closest", margin: { t: 60, b: 40, l: 40, r: 10 },
+    xaxis: { zeroline: false, showgrid: false },
+    yaxis: { zeroline: false, showgrid: false, scaleanchor: "x" },
+  };
+  Plotly.react("plot", traces, layout, { responsive: true, displaylogo: false });
+  note.innerHTML = "<b>Scanpath (tipo):</b> " + nodes.length + " categorías · " +
+    vis.length + " aristas visibles de " + edges.length + ". Transiciones " +
+    "agregadas entre categorías gramaticales; layout de muelle determinista. n = " +
+    "sujetos del cuartil " + qval() + " de " + lang + ".";
+}
+
+// --- animación -------------------------------------------------------------
+function stopAnim() {
+  state.animating = false;
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+  document.getElementById("play").textContent = "▶";
+}
+function setT(v) {
+  state.tpos = v;
+  document.getElementById("range").value = Math.round(v * 1000);
+  document.getElementById("progress").textContent = Math.round(v * 100) + "%";
+  draw();
+}
+function tick() {
+  const speed = +document.getElementById("speed").value;
+  const next = Math.min(1, state.tpos + speed / 100);
+  setT(next);
+  if (next >= 1) stopAnim();
+}
+
+document.getElementById("play").onclick = () => {
+  if (state.animating) { stopAnim(); return; }
+  if (state.tpos >= 1) state.tpos = 0;
+  state.animating = true;
+  document.getElementById("play").textContent = "❚❚";
+  state.timer = setInterval(tick, 40);
+};
+document.getElementById("range").oninput = e => {
+  stopAnim();
+  setT(+e.target.value / 1000);
+};
+
+// --- eventos ---------------------------------------------------------------
+document.getElementById("grain").onchange = () => { setT(0); draw(); };
+document.getElementById("lang").onchange = () => {
+  updateLangInfo(); updateTexts(); setT(0); draw();
+};
+document.getElementById("text").onchange = () => { setT(0); draw(); };
+document.querySelectorAll('input[name=q]').forEach(el =>
+  el.onchange = () => { updateTexts(); setT(0); draw(); });
+document.querySelectorAll('input[name=mode]').forEach(el =>
+  el.onchange = () => { stopAnim(); setT(0); draw(); });
+document.querySelectorAll('#f-fwd, #f-reg, #f-labels').forEach(el =>
+  el.onchange = () => draw());
+
+init();
+</script>
+</body>
+</html>
