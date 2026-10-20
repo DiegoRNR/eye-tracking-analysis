@@ -189,3 +189,155 @@ def plot_variant(
         e.insert(1, "stress", stress)
         embeddings_out.append(e)
     return stress
+
+
+def plot_closeness_vs_comprehension(mode: str) -> tuple[Path, Path]:
+    """
+    Genera figuras de correlación entre cercanía a nativos de inglés (1 - J-S)
+    y comprensión lectora (accuracy %) para los cortes: all, Q1 y Q4.
+
+    Retorna:
+    1. closeness_vs_comprehension_all_q1_q4.png (3 paneles: L2 en all, Q1, Q4)
+    2. closeness_vs_comprehension_full_comparison.png (2x3: L2 arriba vs L1 abajo)
+    """
+    from scipy import stats
+
+    df_path = paths.distances_dir(mode) / "distance_to_native.csv"
+    if not df_path.exists():
+        raise FileNotFoundError(f"No se encontró {df_path}")
+    df = pd.read_csv(df_path)
+
+    langs = paths.target_langs()
+    palette = _lang_palette(langs)
+
+    # -------------------------------------------------------------------------
+    # Figura 1: L2 (Lectura en inglés) - 3 paneles: all, Q1, Q4
+    # -------------------------------------------------------------------------
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5.5), sharey=True)
+    quartiles = [("all", "Todos los sujetos"), ("Q1", "Cuartil bajo (Q1)"), ("Q4", "Cuartil alto (Q4)")]
+
+    for i, (q, q_title) in enumerate(quartiles):
+        ax = axes[i]
+        sub = df[(df["session"] == "L2") & (df["quartile"] == q)].dropna(subset=["accuracy", "closeness_mean"])
+
+        xs = sub["accuracy"].values * 100.0  # en %
+        ys = sub["closeness_mean"].values
+        lgs = sub["lang"].values
+
+        for x, y, lg in zip(xs, ys, lgs):
+            c = palette.get(lg, "#4a5568")
+            lbl = paths.fig_label(lg)
+            ax.scatter(x, y, color=c, s=55, alpha=0.9, edgecolors="#333", linewidth=0.6, zorder=4)
+            ax.annotate(lbl, (x, y), xytext=(3, 3), textcoords="offset points", fontsize=7.2, color="#2d3748")
+
+        # Referencias nativas
+        ref_accs = []
+        for ref_col in ("acc_en_ca", "acc_en_uk"):
+            if ref_col in sub.columns and not sub[ref_col].dropna().empty:
+                ref_accs.append(sub[ref_col].dropna().iloc[0] * 100.0)
+        for r_idx, r_acc in enumerate(ref_accs):
+            r_name = "en_ca" if r_idx == 0 else "en_uk"
+            ax.scatter(r_acc, 1.0, marker="*", s=130, color="#d69e2e", edgecolors="#1a202c", linewidth=0.8, zorder=5)
+            ax.annotate(f"★ {r_name} (ref)", (r_acc, 1.0), xytext=(-15, -12), textcoords="offset points",
+                        fontsize=7.5, fontweight="bold", color="#744210")
+
+        # Línea de regresión OLS y estadísticas
+        if len(sub) > 2:
+            r, p_val = stats.pearsonr(sub["accuracy"], sub["closeness_mean"])
+            rho, sp_val = stats.spearmanr(sub["accuracy"], sub["closeness_mean"])
+
+            slope, intercept = np.polyfit(xs, ys, 1)
+            x_line = np.linspace(xs.min(), xs.max(), 100)
+            y_line = slope * x_line + intercept
+            ax.plot(x_line, y_line, color="#2b6cb0", linestyle="--", linewidth=1.8, label="Tendencia OLS", zorder=3)
+
+            signif = " (p < 0.01)" if p_val < 0.01 else (" (p < 0.05)" if p_val < 0.05 else " (n.s.)")
+            stat_box = (
+                f"Pearson r = {r:+.3f}{signif}\n"
+                f"p-valor = {p_val:.4f}\n"
+                f"Spearman ρ = {rho:+.3f} (p={sp_val:.4f})\n"
+                f"n = {len(sub)} lenguas"
+            )
+            ax.text(0.04, 0.06, stat_box, transform=ax.transAxes, fontsize=8.0,
+                    verticalalignment="bottom", bbox=dict(boxstyle="round,pad=0.4", facecolor="#edf2f7", edgecolor="#cbd5e0", alpha=0.9))
+
+        ax.set_title(f"L2 inglés · {q_title}", fontsize=11, fontweight="bold")
+        ax.set_xlabel("Comprensión lectora (% accuracy)", fontsize=9.5)
+        if i == 0:
+            ax.set_ylabel("Cercanía a nativos de inglés (1 − JSD)", fontsize=9.5)
+        ax.grid(True, linestyle=":", alpha=0.4)
+        ax.set_ylim(0.80, 1.02)
+
+    fig.suptitle(
+        f"Correlación: Comprensión Lectora vs Cercanía a Lectores Nativos de Inglés (L2)\n"
+        f"Modo: {mode} · Cortes: Todos los sujetos, Cuartil Bajo (Q1) y Cuartil Alto (Q4)",
+        fontsize=13, fontweight="bold", y=1.02
+    )
+    fig.tight_layout()
+    out1 = paths.figures_dir(mode) / "closeness_vs_comprehension_all_q1_q4.png"
+    fig.savefig(out1, dpi=200, bbox_inches="tight")
+    plt.close(fig)
+
+    # -------------------------------------------------------------------------
+    # Figura 2: 2x3 completo (L2 inglés arriba vs L1 nativo abajo)
+    # -------------------------------------------------------------------------
+    fig2, axes2 = plt.subplots(2, 3, figsize=(16, 10), sharey="row")
+    sessions = [("L2", "Lectura en inglés (L2)"), ("L1", "Lectura en lengua nativa (L1)")]
+
+    for row_idx, (sess, sess_title) in enumerate(sessions):
+        for col_idx, (q, q_title) in enumerate(quartiles):
+            ax = axes2[row_idx, col_idx]
+            sub = df[(df["session"] == sess) & (df["quartile"] == q)].dropna(subset=["accuracy", "closeness_mean"])
+            xs = sub["accuracy"].values * 100.0
+            ys = sub["closeness_mean"].values
+            lgs = sub["lang"].values
+
+            for x, y, lg in zip(xs, ys, lgs):
+                c = palette.get(lg, "#4a5568")
+                lbl = paths.fig_label(lg)
+                ax.scatter(x, y, color=c, s=50, alpha=0.9, edgecolors="#333", linewidth=0.6, zorder=4)
+                ax.annotate(lbl, (x, y), xytext=(3, 3), textcoords="offset points", fontsize=6.8, color="#2d3748")
+
+            if sess == "L2":
+                ref_accs = []
+                for ref_col in ("acc_en_ca", "acc_en_uk"):
+                    if ref_col in sub.columns and not sub[ref_col].dropna().empty:
+                        ref_accs.append(sub[ref_col].dropna().iloc[0] * 100.0)
+                for r_acc in ref_accs:
+                    ax.scatter(r_acc, 1.0, marker="*", s=110, color="#d69e2e", edgecolors="#1a202c", linewidth=0.8, zorder=5)
+
+            if len(sub) > 2:
+                r, p_val = stats.pearsonr(sub["accuracy"], sub["closeness_mean"])
+                rho, sp_val = stats.spearmanr(sub["accuracy"], sub["closeness_mean"])
+                slope, intercept = np.polyfit(xs, ys, 1)
+                x_line = np.linspace(xs.min(), xs.max(), 100)
+                y_line = slope * x_line + intercept
+                line_color = "#2b6cb0" if sess == "L2" else "#718096"
+                ax.plot(x_line, y_line, color=line_color, linestyle="--", linewidth=1.6, zorder=3)
+
+                signif = " (p < 0.01)" if p_val < 0.01 else (" (p < 0.05)" if p_val < 0.05 else " (n.s.)")
+                stat_box = (
+                    f"r = {r:+.3f}{signif}\n"
+                    f"p = {p_val:.4f}\n"
+                    f"ρ = {rho:+.3f}"
+                )
+                ax.text(0.04, 0.06, stat_box, transform=ax.transAxes, fontsize=7.5,
+                        verticalalignment="bottom", bbox=dict(boxstyle="round,pad=0.3", facecolor="#edf2f7", edgecolor="#cbd5e0", alpha=0.9))
+
+            ax.set_title(f"{sess_title} · {q_title}", fontsize=10.5, fontweight="bold")
+            ax.set_xlabel("Comprensión lectora (% accuracy)", fontsize=9)
+            if col_idx == 0:
+                ax.set_ylabel("Cercanía a nativos (1 − JSD)", fontsize=9)
+            ax.grid(True, linestyle=":", alpha=0.4)
+
+    fig2.suptitle(
+        f"Contraste: Comprensión vs Cercanía a Nativos de Inglés — Modo {mode}\n"
+        f"(Arriba: L2 inglés muestra correlación significativa en all y Q1; Abajo: L1 nativo muestra especificidad sin correlación)",
+        fontsize=12.5, fontweight="bold", y=1.01
+    )
+    fig2.tight_layout()
+    out2 = paths.figures_dir(mode) / "closeness_vs_comprehension_full_comparison.png"
+    fig2.savefig(out2, dpi=200, bbox_inches="tight")
+    plt.close(fig2)
+
+    return out1, out2

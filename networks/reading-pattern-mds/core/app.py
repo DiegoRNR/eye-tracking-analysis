@@ -207,6 +207,16 @@ def figures_all(mode: str) -> dict:
         meta["figures"][f.name] = {"stress": s, "n_points": len(conds)}
         print(f"[figures] {f.name} n={len(conds)} stress={s:.3f}")
 
+    # --- figuras de correlación cercanía a inglés vs comprensión (all, Q1, Q4)
+    try:
+        f_corr1, f_corr2 = viz.plot_closeness_vs_comprehension(mode)
+        meta["figures"][f_corr1.name] = {"type": "correlation_closeness_comprehension_l2"}
+        meta["figures"][f_corr2.name] = {"type": "correlation_closeness_comprehension_full"}
+        print(f"[figures] {f_corr1.name} (L2 all, Q1, Q4)")
+        print(f"[figures] {f_corr2.name} (L2 vs L1 all, Q1, Q4)")
+    except Exception as e:
+        print(f"[figures] error generando gráficos de correlación: {e}")
+
     if emb_rows:
         pd.concat(emb_rows, ignore_index=True).to_csv(
             paths.distances_dir(mode) / "embeddings.csv", index=False

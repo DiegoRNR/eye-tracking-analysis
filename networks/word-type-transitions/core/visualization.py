@@ -268,6 +268,122 @@ def plot_transitions_bar(lang: str, mode: str, top_k: int = 15) -> Optional[Path
     return out
 
 
+def plot_transitions_normalized_bar(lang: str, mode: str, top_k: int = 15) -> Optional[Path]:
+    """Top-K transiciones clase→clase por probabilidad condicional P(destino | origen) (%), panel por condición."""
+    matrices = {}
+    for session, q in CELLS:
+        m = _load_matrix(lang, mode, session, q)
+        if m is None:
+            return None
+        matrices[(session, q)] = m
+
+    fig, axes = plt.subplots(2, 2, figsize=(13, 10))
+    for (session, q), ax in zip(CELLS, axes.flat):
+        m = matrices[(session, q)]
+        edges = []
+        for u in m.index:
+            for v in m.columns:
+                pct = float(m.loc[u, v]) * 100.0
+                if pct > 0:
+                    edges.append((f"{u}→{v}", pct, u, u == v))
+        if not edges:
+            ax.axis("off")
+            ax.set_title(f"{session} · {'peor' if q == 'Q1' else 'mejor'}", fontsize=10)
+            continue
+        edges.sort(key=lambda t: -t[1])
+        edges = edges[:top_k][::-1]
+        y = np.arange(len(edges))
+        bar_colors = [NODE_PALETTE.get(u, "#888888") for _, _, u, _ in edges]
+        ax.barh(y, [pct for _, pct, _, _ in edges], color=bar_colors, alpha=0.85)
+        max_pct = max(e[1] for e in edges)
+        for i, (_, pct, _, loop) in enumerate(edges):
+            ax.text(pct + max_pct * 0.015, i, f"{pct:.1f}%", va="center", fontsize=6.8)
+        ax.set_yticks(y, [e for e, _, _, _ in edges], fontsize=7)
+        ax.set_xlim(0, max_pct * 1.15)
+        ax.set_xlabel("P(destino | origen) % de salidas de la clase", fontsize=8.5)
+        ax.set_title(f"{session} · {'peor' if q == 'Q1' else 'mejor'}", fontsize=10)
+        ax.grid(axis="x", alpha=0.2)
+    fig.suptitle(
+        f"Top-{top_k} transiciones normalizadas por clase de origen P(destino | origen) — "
+        f"{LANG_NAMES.get(lang, lang)} · modo {mode}\n(Controla el sesgo por frecuencia de palabras para comparar clases de forma justa)",
+        fontsize=11.5,
+    )
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=NODE_PALETTE[n], label=n) for n in FUSED_ORDER]
+    fig.legend(handles=handles, loc="lower center", ncol=11, fontsize=7, title="clase origen")
+    fig.tight_layout(rect=(0, 0.06, 1, 0.94))
+    out = _fpath(lang, mode, "transitions_normalized_bar.png")
+    fig.savefig(out, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
+def plot_transitions_comparison(lang: str, mode: str, top_k: int = 10) -> Optional[Path]:
+    """Comparación directa lado a lado: Conteo Absoluto vs Porcentaje Normalizado P(v|u) por condición."""
+    counts = {}
+    matrices = {}
+    for session, q in CELLS:
+        c = _load_counts(lang, mode, session, q)
+        m = _load_matrix(lang, mode, session, q)
+        if c is None or m is None:
+            return None
+        counts[(session, q)] = c
+        matrices[(session, q)] = m
+
+    fig, axes = plt.subplots(4, 2, figsize=(14, 15))
+    for i, (session, q) in enumerate(CELLS):
+        ax_cnt = axes[i, 0]
+        ax_pct = axes[i, 1]
+        c = counts[(session, q)]
+        m = matrices[(session, q)]
+
+        # Conteo
+        edges_c = []
+        for u in c.index:
+            for v in c.columns:
+                n = float(c.loc[u, v])
+                if n > 0:
+                    edges_c.append((f"{u}→{v}", n, u))
+        edges_c.sort(key=lambda t: -t[1])
+        edges_c = edges_c[:top_k][::-1]
+        y_c = np.arange(len(edges_c))
+        ax_cnt.barh(y_c, [n for _, n, _ in edges_c], color=[NODE_PALETTE.get(u, "#888") for _, _, u in edges_c], alpha=0.85)
+        for idx, (_, n, _) in enumerate(edges_c):
+            ax_cnt.text(n + edges_c[-1][1] * 0.02, idx, f"{n:,.0f}", va="center", fontsize=6.5)
+        ax_cnt.set_yticks(y_c, [e for e, _, _ in edges_c], fontsize=7)
+        ax_cnt.set_title(f"{session} {'peor (Q1)' if q == 'Q1' else 'mejor (Q4)'} · Conteos Absolutos (n)", fontsize=9.5, fontweight="bold")
+        ax_cnt.grid(axis="x", alpha=0.2)
+
+        # Normalizado
+        edges_p = []
+        for u in m.index:
+            for v in m.columns:
+                p = float(m.loc[u, v]) * 100.0
+                if p > 0:
+                    edges_p.append((f"{u}→{v}", p, u))
+        edges_p.sort(key=lambda t: -t[1])
+        edges_p = edges_p[:top_k][::-1]
+        y_p = np.arange(len(edges_p))
+        ax_pct.barh(y_p, [p for _, p, _ in edges_p], color=[NODE_PALETTE.get(u, "#888") for _, _, u in edges_p], alpha=0.85)
+        for idx, (_, p, _) in enumerate(edges_p):
+            ax_pct.text(p + edges_p[-1][1] * 0.02, idx, f"{p:.1f}%", va="center", fontsize=6.5)
+        ax_pct.set_yticks(y_p, [e for e, _, _ in edges_p], fontsize=7)
+        ax_pct.set_title(f"{session} {'peor (Q1)' if q == 'Q1' else 'mejor (Q4)'} · Tasa Normalizada P(destino|origen) %", fontsize=9.5, fontweight="bold")
+        ax_pct.grid(axis="x", alpha=0.2)
+
+    fig.suptitle(
+        f"Distribución de enlaces entre tipos de palabra: Conteo Absoluto vs Tasa Normalizada — {LANG_NAMES.get(lang, lang)} ({mode})\n"
+        f"(El panel izquierdo refleja el volumen dominado por clases frecuentes; el derecho mide la probabilidad de transición relativa)",
+        fontsize=11.5,
+    )
+    handles = [plt.Rectangle((0, 0), 1, 1, facecolor=NODE_PALETTE[n], label=n) for n in FUSED_ORDER]
+    fig.legend(handles=handles, loc="lower center", ncol=11, fontsize=7, title="clase origen")
+    fig.tight_layout(rect=(0, 0.04, 1, 0.96))
+    out = _fpath(lang, mode, "transitions_comparison.png")
+    fig.savefig(out, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # 3. Barras de fijaciones por clase
 # ---------------------------------------------------------------------------
@@ -799,6 +915,8 @@ def generate_all_figures(langs: Optional[List[str]] = None, modes=("temporal", "
                 continue
             if plot_transitions_bar(lang, mode):
                 n["trans"] += 1
+            plot_transitions_normalized_bar(lang, mode)
+            plot_transitions_comparison(lang, mode)
             if plot_fixations_bar(lang, mode):
                 n["fix"] += 1
             bw, l1l2 = plot_diff_heatmaps(lang, mode)
