@@ -428,6 +428,141 @@ def plot_fixations_bar(lang: str, mode: str) -> Optional[Path]:
     return out
 
 
+def plot_fixations_normalized_bar(lang: str, mode: str) -> Optional[Path]:
+    """Porcentaje de fijaciones por clase sobre el total de la condición: 4 series (2×2)."""
+    attrs = {}
+    for session, q in CELLS:
+        a = _load_node_attrs(lang, mode, session, q)
+        if a is None:
+            return None
+        attrs[(session, q)] = a
+
+    nodes = [n for n in FUSED_ORDER if any(n in a.index for a in attrs.values())]
+    if not nodes:
+        return None
+    x = np.arange(len(nodes))
+    width = 0.2
+
+    fig, ax = plt.subplots(figsize=(11, 5.5))
+    max_pct = 0.0
+    for k, (session, q) in enumerate(CELLS):
+        a = attrs[(session, q)]
+        total_fix = float(a["n_fixations"].sum()) if "n_fixations" in a.columns else 0.0
+        vals = [
+            (float(a.loc[n, "n_fixations"]) / total_fix * 100.0) if (n in a.index and total_fix > 0) else 0.0
+            for n in nodes
+        ]
+        if vals:
+            max_pct = max(max_pct, max(vals))
+        bars = ax.bar(
+            x + (k - 1.5) * width, vals, width, label=f"{session}-{'peor' if q == 'Q1' else 'mejor'}",
+            color=SESSION_COLORS[session], alpha=0.55 if q == "Q1" else 0.95,
+            edgecolor=QUARTILE_COLORS[q], linewidth=0.8 if q == "Q1" else 0.0,
+        )
+        for bar, v in zip(bars, vals):
+            if v >= 2.0:
+                ax.text(bar.get_x() + bar.get_width() / 2.0, v + 0.5, f"{v:.1f}%",
+                        ha="center", va="bottom", fontsize=5.8, rotation=90)
+
+    ax.set_xticks(x, nodes, fontsize=9)
+    ax.set_ylabel("% de fijaciones (sobre el total de la condición)", fontsize=9.5)
+    ax.set_ylim(0, max_pct * 1.18 if max_pct > 0 else 100.0)
+    ax.set_title(
+        f"Distribución porcentual de fijaciones por clase de palabra — {LANG_NAMES.get(lang, lang)} · modo {mode}\n"
+        f"(Normalizado: las barras de cada condición suman 100% para comparar de forma justa)",
+        fontsize=11.5,
+    )
+    ax.grid(axis="y", alpha=0.25)
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L1, alpha=0.55, edgecolor=C_Q1, label="L1 · peor (Q1)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L1, alpha=0.95, edgecolor=C_Q4, label="L1 · mejor (Q4)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L2, alpha=0.55, edgecolor=C_Q1, label="L2 · peor (Q1)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L2, alpha=0.95, edgecolor=C_Q4, label="L2 · mejor (Q4)"),
+    ]
+    ax.legend(handles=handles, fontsize=8, ncol=2)
+    fig.tight_layout()
+    out = _fpath(lang, mode, "fixations_normalized_bar.png")
+    fig.savefig(out, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
+def plot_fixations_comparison(lang: str, mode: str) -> Optional[Path]:
+    """Comparación vertical directa: Conteos Absolutos (arriba) vs Porcentaje Normalizado (abajo)."""
+    attrs = {}
+    for session, q in CELLS:
+        a = _load_node_attrs(lang, mode, session, q)
+        if a is None:
+            return None
+        attrs[(session, q)] = a
+
+    nodes = [n for n in FUSED_ORDER if any(n in a.index for a in attrs.values())]
+    if not nodes:
+        return None
+    x = np.arange(len(nodes))
+    width = 0.2
+
+    fig, (ax_cnt, ax_pct) = plt.subplots(2, 1, figsize=(12, 9), sharex=True)
+
+    # 1. Conteos absolutos
+    for k, (session, q) in enumerate(CELLS):
+        a = attrs[(session, q)]
+        vals = [float(a.loc[n, "n_fixations"]) if n in a.index else 0.0 for n in nodes]
+        ax_cnt.bar(
+            x + (k - 1.5) * width, vals, width,
+            color=SESSION_COLORS[session], alpha=0.55 if q == "Q1" else 0.95,
+            edgecolor=QUARTILE_COLORS[q], linewidth=0.8 if q == "Q1" else 0.0,
+        )
+    ax_cnt.set_ylabel("n de fijaciones (pooled)", fontsize=9.5)
+    ax_cnt.set_title("Conteos Absolutos (n fijaciones por clase)", fontsize=10.5, fontweight="bold")
+    ax_cnt.grid(axis="y", alpha=0.25)
+
+    # 2. Porcentajes normalizados
+    max_p = 0.0
+    for k, (session, q) in enumerate(CELLS):
+        a = attrs[(session, q)]
+        total_fix = float(a["n_fixations"].sum()) if "n_fixations" in a.columns else 0.0
+        vals = [
+            (float(a.loc[n, "n_fixations"]) / total_fix * 100.0) if (n in a.index and total_fix > 0) else 0.0
+            for n in nodes
+        ]
+        if vals:
+            max_p = max(max_p, max(vals))
+        bars = ax_pct.bar(
+            x + (k - 1.5) * width, vals, width,
+            color=SESSION_COLORS[session], alpha=0.55 if q == "Q1" else 0.95,
+            edgecolor=QUARTILE_COLORS[q], linewidth=0.8 if q == "Q1" else 0.0,
+        )
+        for bar, v in zip(bars, vals):
+            if v >= 2.0:
+                ax_pct.text(bar.get_x() + bar.get_width() / 2.0, v + 0.4, f"{v:.1f}%",
+                            ha="center", va="bottom", fontsize=5.8, rotation=90)
+
+    ax_pct.set_xticks(x, nodes, fontsize=9)
+    ax_pct.set_ylabel("% de fijaciones (suma = 100%)", fontsize=9.5)
+    ax_pct.set_ylim(0, max_p * 1.18 if max_p > 0 else 100.0)
+    ax_pct.set_title("Tasa Normalizada (% sobre el total de fijaciones de cada condición)", fontsize=10.5, fontweight="bold")
+    ax_pct.grid(axis="y", alpha=0.25)
+
+    handles = [
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L1, alpha=0.55, edgecolor=C_Q1, label="L1 · peor (Q1)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L1, alpha=0.95, edgecolor=C_Q4, label="L1 · mejor (Q4)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L2, alpha=0.55, edgecolor=C_Q1, label="L2 · peor (Q1)"),
+        plt.Rectangle((0, 0), 1, 1, facecolor=C_L2, alpha=0.95, edgecolor=C_Q4, label="L2 · mejor (Q4)"),
+    ]
+    fig.legend(handles=handles, loc="upper right", bbox_to_anchor=(0.98, 0.98), fontsize=8, ncol=2)
+
+    fig.suptitle(
+        f"Fijaciones por clase de palabra: Conteo Absoluto vs Porcentaje Normalizado — {LANG_NAMES.get(lang, lang)} · modo {mode}",
+        fontsize=12, fontweight="bold", y=0.99
+    )
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
+    out = _fpath(lang, mode, "fixations_comparison.png")
+    fig.savefig(out, dpi=160, bbox_inches="tight")
+    plt.close(fig)
+    return out
+
+
 # ---------------------------------------------------------------------------
 # 4/5. Heatmaps de DIFERENCIA (divergentes, escala compartida)
 # ---------------------------------------------------------------------------
@@ -919,6 +1054,8 @@ def generate_all_figures(langs: Optional[List[str]] = None, modes=("temporal", "
             plot_transitions_comparison(lang, mode)
             if plot_fixations_bar(lang, mode):
                 n["fix"] += 1
+            plot_fixations_normalized_bar(lang, mode)
+            plot_fixations_comparison(lang, mode)
             bw, l1l2 = plot_diff_heatmaps(lang, mode)
             if bw:
                 n["bw"] += 1

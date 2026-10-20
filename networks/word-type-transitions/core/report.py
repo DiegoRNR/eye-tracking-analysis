@@ -80,8 +80,12 @@ def generate_report(lang: str, modes=("temporal", "regression")) -> Path:
         # --- figuras del modo
         lines += [f"### Figuras (modo {mode})", ""]
         for name, label in [
-            ("transitions_bar", "Top transiciones clase→clase (bar)"),
-            ("fixations_bar", "n de fijaciones por clase (bar)"),
+            ("transitions_bar", "Top transiciones clase→clase (conteo absoluto)"),
+            ("transitions_normalized_bar", "Top transiciones normalizadas P(destino|origen) (%)"),
+            ("transitions_comparison", "Comparación de transiciones: conteo vs normalizado (bar)"),
+            ("fixations_bar", "n de fijaciones por clase (conteo absoluto)"),
+            ("fixations_normalized_bar", "Fijaciones por clase normalizadas (% sobre total condición)"),
+            ("fixations_comparison", "Comparación de fijaciones: conteo vs porcentaje (bar)"),
             ("heatmap_bestworst", "Heatmap Q4−Q1 (mejores vs peores)"),
             ("heatmap_l1vl2", "Heatmap L1−L2 (mismo cuartil)"),
             ("network", "Grafo de red 2×2 (PNG)"),
