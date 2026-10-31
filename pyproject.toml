@@ -5,10 +5,19 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "jieba>=0.42.1",
     "matplotlib>=3.11.1",
     "networkx>=3.6.1",
+    "opencc-python-reimplemented>=0.1.7",
+    "openpyxl>=3.1.5",
     "pandas>=3.0.5",
+    "plotly>=6.9.0",
+    "pyphen>=0.18.1",
     "pyvis>=0.3.2",
     "scipy>=1.17.1",
     "seaborn>=0.13.2",
+    "spacy>=3.8.16",
+    "stanza>=1.14.0",
+    "statsmodels>=0.14.6",
+    "wordfreq>=3.1.1",
 ]

@@ -10,6 +10,7 @@ Cada tipo de red del proyecto vive en su propia subcarpeta, siguiendo un esquema
 |---------|------------|--------|
 | [`cognitive-load/`](cognitive-load/README.md) | Carga cognitiva via ΔPS entre palabras consecutivas; cascadas pupilares y modularidad del esfuerzo. | Implementada |
 | [`scanpath/`](scanpath/README.md) | Transiciones de sacadas entre palabras; reciprocidad, regresiones, PageRank. | En transición al esquema estándar |
+| [`word-type-transitions/`](word-type-transitions/README.md) | Redes dirigidas entre **tipos de palabra** a partir de la secuencia de fijaciones; diseño 2×2 {L1 nativo, L2 inglés} × {Q1, Q4} por comprensión (duración de fijación = carga cognitiva en nodos), 14 grupos lingüísticos (wave 1 + chino; benchmarks wave 2 listos para extender a 29), modos `temporal` y `regression`. | Implementada |
 | [`alignment/`](alignment/README.md) | Compara la red de sacadas con la estructura semántica/sintáctica del texto. | Pendiente |
 | [`bipartite/`](bipartite/README.md) | Red participante ↔ palabra con métricas de fijación como pesos. | Pendiente |
 
