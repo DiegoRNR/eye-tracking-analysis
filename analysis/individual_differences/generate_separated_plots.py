@@ -12,9 +12,11 @@ Genera los gráficos individuales separados en alta resolución (300 DPI):
 from __future__ import annotations
 
 import shutil
+import textwrap
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from matplotlib.patches import FancyBboxPatch
 import numpy as np
 import pandas as pd
 import seaborn as sns
@@ -319,68 +321,174 @@ def plot_figure_3b_boxplots(df: pd.DataFrame):
 # 5. FIGURA 3C: TARJETA VISUAL DE PERFILES DE ARQUETIPOS
 # ===========================================================================
 def plot_figure_3c_profiles_table(df: pd.DataFrame):
-    fig, ax = plt.subplots(figsize=(10.5, 5.5), dpi=300)
+    fig, ax = plt.subplots(figsize=(11.8, 6.2), dpi=300)
     fig.patch.set_facecolor("#FFFFFF")
     ax.axis("off")
 
     cards = [
         {
-            "title": "NATIVOIDE / EFICIENTE",
+            "title_lines": ["NATIVOIDE /", "EFICIENTE"],
             "share": "27.7% (N = 286)",
             "color": "#10B981",
             "bg": "#ECFDF5",
-            "stats": ["Vocabulario: 37.0 / 40", "LexTALE: 86.9%", "Fijación: 202 ms", "Regresiones: 12.9%", "Comprensión: 78.3%"],
-            "strategy": "Fluidez automática en 1er pase sin necesidad de relectura."
+            "stats": [
+                "Vocabulario: 37.0 / 40",
+                "LexTALE: 86.9%",
+                "Fijación: 202 ms",
+                "Regresiones: 12.9%",
+                "Comprensión: 78.3%",
+            ],
+            "strategy": "Fluidez automática en primer pase sin necesidad de relectura compensatoria.",
         },
         {
-            "title": "ESTRATÉGICO / COMPENSADOR",
+            "title_lines": ["ESTRATÉGICO /", "COMPENSADOR"],
             "share": "23.7% (N = 245)",
             "color": "#8B5CF6",
             "bg": "#F5F3FF",
-            "stats": ["Vocabulario: 36.1 / 40", "LexTALE: 84.1%", "Fijación: 213 ms", "Regresiones: 21.1%", "Comprensión: 76.1%"],
-            "strategy": "Relectura activa y monitoreo para asegurar comprensión."
+            "stats": [
+                "Vocabulario: 36.1 / 40",
+                "LexTALE: 84.1%",
+                "Fijación: 213 ms",
+                "Regresiones: 21.1%",
+                "Comprensión: 76.1%",
+            ],
+            "strategy": "Relectura activa y monitoreo constante para asegurar comprensión profunda.",
         },
         {
-            "title": "INTERMEDIO / MODERADO",
+            "title_lines": ["INTERMEDIO /", "MODERADO"],
             "share": "32.2% (N = 332)",
             "color": "#3B82F6",
             "bg": "#EFF6FF",
-            "stats": ["Vocabulario: 30.0 / 40", "LexTALE: 70.0%", "Fijación: 236 ms", "Regresiones: 13.6%", "Comprensión: 72.2%"],
-            "strategy": "Mayor tiempo invertido por fijación para decodificar texto."
+            "stats": [
+                "Vocabulario: 30.0 / 40",
+                "LexTALE: 70.0%",
+                "Fijación: 236 ms",
+                "Regresiones: 13.6%",
+                "Comprensión: 72.2%",
+            ],
+            "strategy": "Mayor tiempo invertido por fijación para decodificar texto en L2.",
         },
         {
-            "title": "BLOQUEADO / CON DIFICULTAD",
+            "title_lines": ["BLOQUEADO /", "CON DIFICULTAD"],
             "share": "16.4% (N = 169)",
             "color": "#EF4444",
             "bg": "#FEF2F2",
-            "stats": ["Vocabulario: 13.5 / 40", "LexTALE: 63.0%", "Fijación: 244 ms", "Regresiones: 13.7%", "Comprensión: 53.6%"],
-            "strategy": "Cuello de botella léxico severo que frena la comprensión."
+            "stats": [
+                "Vocabulario: 13.5 / 40",
+                "LexTALE: 63.0%",
+                "Fijación: 244 ms",
+                "Regresiones: 13.7%",
+                "Comprensión: 53.6%",
+            ],
+            "strategy": "Cuello de botella léxico severo que interrumpe el flujo y frena comprensión.",
         },
     ]
 
-    # Dibujar 4 columnas tipo tarjetas
-    for i, c in enumerate(cards):
-        x0 = 0.03 + i * 0.245
-        y0 = 0.08
-        w = 0.22
-        h = 0.82
+    w = 0.224
+    gap = 0.02
+    left = 0.024
+    y0 = 0.04
+    h = 0.88
 
-        # Card container
-        rect = plt.Rectangle((x0, y0), w, h, facecolor=c["bg"], edgecolor=c["color"], linewidth=1.8, transform=ax.transAxes, clip_on=False)
+    for i, c in enumerate(cards):
+        x0 = left + i * (w + gap)
+
+        # Card container with rounded corners
+        rect = FancyBboxPatch(
+            (x0, y0), w, h,
+            boxstyle="round,pad=0.0,rounding_size=0.02",
+            facecolor=c["bg"],
+            edgecolor=c["color"],
+            linewidth=1.8,
+            transform=ax.transAxes,
+            clip_on=False,
+        )
         ax.add_patch(rect)
 
-        # Header
-        ax.text(x0 + w/2, y0 + h - 0.08, c["title"], transform=ax.transAxes, ha="center", fontsize=9.5, fontweight="bold", color=c["color"])
-        ax.text(x0 + w/2, y0 + h - 0.14, c["share"], transform=ax.transAxes, ha="center", fontsize=8.8, fontweight="semibold", color="#475569")
+        # Title (2 lines)
+        title_text = "\n".join(c["title_lines"])
+        ax.text(
+            x0 + w / 2, y0 + h - 0.055,
+            title_text,
+            transform=ax.transAxes,
+            ha="center", va="top",
+            fontsize=9.2, fontweight="bold",
+            color=c["color"],
+            linespacing=1.1,
+        )
 
-        # Stats
+        # Share badge
+        ax.text(
+            x0 + w / 2, y0 + h - 0.155,
+            c["share"],
+            transform=ax.transAxes,
+            ha="center", va="top",
+            fontsize=8.2, fontweight="semibold",
+            color="#475569",
+        )
+
+        # Separator line 1
+        ax.plot(
+            [x0 + 0.015, x0 + w - 0.015],
+            [y0 + h - 0.19, y0 + h - 0.19],
+            color=c["color"], alpha=0.35, linewidth=0.9,
+            transform=ax.transAxes,
+        )
+
+        # Section: Métricas Promedio
+        ax.text(
+            x0 + 0.018, y0 + h - 0.215,
+            "Métricas Promedio:",
+            transform=ax.transAxes,
+            va="top",
+            fontsize=7.8, fontweight="bold",
+            color="#64748B",
+        )
+
         stats_text = "\n".join([f"• {s}" for s in c["stats"]])
-        ax.text(x0 + 0.02, y0 + h - 0.20, stats_text, transform=ax.transAxes, va="top", fontsize=8.5, color="#1E293B", linespacing=1.6)
+        ax.text(
+            x0 + 0.018, y0 + h - 0.26,
+            stats_text,
+            transform=ax.transAxes,
+            va="top",
+            fontsize=8.0,
+            color="#1E293B",
+            linespacing=1.45,
+        )
 
-        # Strategy footer
-        ax.text(x0 + 0.02, y0 + 0.16, f"Estrategia:\n{c['strategy']}", transform=ax.transAxes, va="top", fontsize=8.0, style="italic", color="#334155", wrap=True)
+        # Separator line 2
+        ax.plot(
+            [x0 + 0.015, x0 + w - 0.015],
+            [y0 + 0.24, y0 + 0.24],
+            color=c["color"], alpha=0.35, linewidth=0.9,
+            transform=ax.transAxes,
+        )
 
-    ax.set_title("Resumen Comparativo de los 4 Arquetipos de Lectura Bilingüe", fontsize=13, fontweight="bold", pad=10, color="#0F172A")
+        # Section: Patrón / Estrategia
+        ax.text(
+            x0 + 0.018, y0 + 0.21,
+            "Patrón y Estrategia:",
+            transform=ax.transAxes,
+            va="top",
+            fontsize=7.8, fontweight="bold",
+            color=c["color"],
+        )
+
+        wrapped_strat = textwrap.fill(c["strategy"], width=23)
+        ax.text(
+            x0 + 0.018, y0 + 0.17,
+            wrapped_strat,
+            transform=ax.transAxes,
+            va="top",
+            fontsize=7.6,
+            color="#334155",
+            linespacing=1.25,
+        )
+
+    ax.set_title(
+        "Perfiles Comparativos de los 4 Arquetipos de Lectura Bilingüe (Clustering k-Means)",
+        fontsize=12.5, fontweight="bold", pad=12, color="#0F172A",
+    )
     plt.tight_layout()
     out_path = PLOTS_DIR / "figure_3c_reader_archetypes_profiles.png"
     plt.savefig(out_path, bbox_inches="tight", dpi=300)
@@ -402,3 +510,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

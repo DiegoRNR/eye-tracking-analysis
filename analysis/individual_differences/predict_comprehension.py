@@ -357,12 +357,12 @@ def generate_visualizations(df: pd.DataFrame, corr_df: pd.DataFrame):
 
     # 1. HEATMAP DE CORRELACIONES
     top_vars = [
-        "accuracy", "language_skill_composite", "lextale", "vocab.t2.5", 
+        "accuracy", "lextale", "vocab.t2.5", 
         "TOWRE_nonword", "spelling", "exposure_english", "english_domain_read", 
         "english_start_age", "linguistic_distance", "cft20"
     ]
     labels_clean = [
-        "Comprensión (Accuracy)", "Composite L2", "LexTALE", "Vocabulario (Nation)", 
+        "Comprensión (Accuracy)", "LexTALE", "Vocabulario (Nation)", 
         "Decod. Fonológica (PDE)", "Ortografía (Spelling)", "% Exposición Inglés", 
         "Autoeval. Lectora", "Edad Inicio Inglés", "Distancia L1 a EN", "Inteligencia (CFT-20)"
     ]
