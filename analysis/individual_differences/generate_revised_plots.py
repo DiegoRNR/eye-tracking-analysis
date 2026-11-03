@@ -223,10 +223,6 @@ def plot_figure_2b_compensation_quartiles(df: pd.DataFrame):
             "n": len(q_data)
         })
 
-        ax.text(0.06, 0.88, f"Pendiente = {slope:+.3f} ({sig_str})\nr = {r_val:+.3f} (p = {p_val:.4f})\nN = {len(q_data)}",
-                transform=ax.transAxes, fontsize=8.8, fontweight="bold",
-                bbox=dict(boxstyle="round,pad=0.3", facecolor="white", edgecolor="#CBD5E1", alpha=0.9))
-
         ax.set_title(q, fontsize=10.5, fontweight="bold", pad=6, color="#0F172A")
         ax.set_xlabel("Tasa de Regresiones (%)", fontsize=9)
         ax.set_ylabel("Comprensión (%)", fontsize=9)
@@ -255,14 +251,6 @@ def plot_figure_2b_compensation_quartiles(df: pd.DataFrame):
     ax_bar.set_title("Comparación de Beneficio de Relectura:\nSolo Q1 compensa con regresiones", fontsize=11, fontweight="bold", pad=10, color="#0F172A")
     ax_bar.set_ylim(-0.15, 1.15)
     ax_bar.grid(True, linestyle="--", alpha=0.4, axis="y")
-
-    # Caja explicativa
-    ax_bar.text(0.5, 0.15, 
-                "Interacción Significativa (p < 0.0001):\n"
-                "• En Q1 (Bajo Vocabulario): Releer eleva masivamente la comprensión.\n"
-                "• En Q2-Q4 (Medio/Alto): No hay efecto; comprenden al primer pase.",
-                transform=ax_bar.transAxes, ha="center", fontsize=8.8, fontweight="semibold",
-                bbox=dict(boxstyle="round,pad=0.4", facecolor="#EFF6FF", edgecolor="#3B82F6", linewidth=1.1))
 
     plt.suptitle("Mecanismo Compensatorio: La Relectura Rescata la Comprensión en Lectores con Bajo Vocabulario (Q1)", 
                  fontsize=13.5, fontweight="bold", y=0.99, color="#0F172A")
@@ -511,11 +499,6 @@ def plot_figure_4_calibration(df: pd.DataFrame):
                  fontsize=12.5, fontweight="bold", pad=12, color="#0F172A")
     ax.grid(True, linestyle="--", alpha=0.4, axis="y")
 
-    # Anotaciones visuales
-    ax.text(0.02, 0.92, "Barras Azules: Tendencia a la Subestimación ('Síndrome del Impostor')\nBarras Naranjas: Tendencia a la Sobreestimación", 
-            transform=ax.transAxes, fontsize=9.2, fontweight="bold",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="white", edgecolor="#CBD5E1", alpha=0.9))
-
     plt.tight_layout()
     out_4b = PLOTS_DIR / "figure_4b_calibration_by_language.png"
     plt.savefig(out_4b, bbox_inches="tight", dpi=300)
@@ -557,14 +540,6 @@ def plot_figure_4_calibration(df: pd.DataFrame):
     ax.set_title("Sesgo de Calibración por Cuartiles de Distancia Lingüística al Inglés", fontsize=12, fontweight="bold", pad=12)
     ax.set_ylim(-0.70, 0.95)
     ax.grid(True, linestyle="--", alpha=0.4, axis="y")
-
-    # Explicación del contraste
-    ax.text(0.04, 0.85, 
-            "Efecto de Distancia Lingüística: β = +0.116 (p = 0.0064)\n"
-            "• Q1 (Cercanas): Fuerte sesgo de subestimación (-0.457, p < .001)\n"
-            "• Q2-Q4 (Más distantes): Mayor autopercepción favorable.",
-            transform=ax.transAxes, fontsize=8.8, fontweight="semibold",
-            bbox=dict(boxstyle="round,pad=0.4", facecolor="#EFF6FF", edgecolor="#3B82F6", alpha=0.9))
 
     plt.tight_layout()
     out_4c = PLOTS_DIR / "figure_4c_calibration_by_distance_quartiles.png"
