@@ -212,3 +212,4 @@ def render_table_image():
 
 if __name__ == "__main__":
     render_table_image()
+
