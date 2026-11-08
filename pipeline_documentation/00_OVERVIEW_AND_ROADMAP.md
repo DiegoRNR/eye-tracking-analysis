@@ -115,3 +115,4 @@ La documentación se ha dividido en módulos especializados que cubren el 100% d
    - Existe una interacción significativa entre vocabulario y regresiones ($\beta = -0.108, p < 0.0001$). Releer y monitorear activamente solo mejora la comprensión en lectores con bajo vocabulario (Cuartil 1: $\beta = +0.844, p = 0.0001$). En lectores avanzados (Q2 a Q4), la pendiente es plana ($p > 0.25$).
 6. **Existencia de 4 Arquetipos de Lectura Bilingüe:**
    - Un espacio latente bidimensional (PC1: Proficiencia/Velocidad, 47.3% varianza; PC2: Relectura/Monitoreo, 18.6% varianza) segmenta a los lectores en 4 clusters empíricos estables: *Nativoide/Eficiente* ($27.7\%$), *Estratégico/Compensador* ($23.7\%$), *Intermedio/Moderado* ($32.2\%$) y *Bloqueado/Dificultad* ($16.4\%$).
+

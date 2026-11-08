@@ -133,3 +133,4 @@ Todos los datos procesados residen en `analysis/individual_differences/output/`:
   * Archivo local: [`networks/reading-pattern-mds/output/reading_patterns_dashboard.html`](file:///Users/diegusho/Documents/Proyecto-Titulo/eye-tracking-analysis/networks/reading-pattern-mds/output/reading_patterns_dashboard.html)
   * Tecnología: Plotly.js interactivo autocontenido en HTML.
   * Capacidades: Exploración en vivo del espacio MDS 2D, filtrado por cuartil de comprensión (Q1/Q4), visualización por lengua y correlaciones dinámicas en tiempo real con la comprensión y la distancia lingüística.
+

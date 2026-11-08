@@ -78,3 +78,4 @@ Cada fila de estos archivos detalla:
 * `fused_tag`: Uno de los 11 nodos del espacio unificado.
 * `length`: Longitud en caracteres.
 * `is_content`: Indicador binario ($1$ = contenido, $0$ = función).
+

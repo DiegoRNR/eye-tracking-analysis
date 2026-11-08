@@ -83,3 +83,4 @@ El pipeline completo se encuentra en [`networks/reading-pattern-mds/`](file:///U
   * `distance_to_native.csv`: Valores JSD y cercanía para cada grupo.
   * `corr_comprehension_reading.csv`: Pruebas de correlación Pearson y Spearman con la comprensión.
   * `corr_linguistic_reading.csv`: Pruebas de correlación con la distancia tipológica URiEL.
+

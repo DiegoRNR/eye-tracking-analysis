@@ -105,3 +105,4 @@ Este documento organiza los hallazgos del proyecto en un formato listo para la r
 | **Figura 4 (Arquetipos PCA)** | `figure_3a_reader_archetypes_pca.png` | Biplot 2D con los vectores de carga y los 4 clusters de lectores. |
 | **Tabla 3 (Perfiles)** | `tabla_resumen_arquetipos.png` | Parámetros exactos (media $\pm$ DE) de cada arquetipo lector. |
 | **Figura 5 (Calibración)** | `figure_4b_calibration_by_language.png` | Sesgo metacognitivo según lengua materna y distancia lingüística. |
+

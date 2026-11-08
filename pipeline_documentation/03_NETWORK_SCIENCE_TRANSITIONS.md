@@ -79,3 +79,4 @@ El pipeline reside en el módulo [`networks/word-type-transitions/`](file:///Use
 * `core/stats.py`: Cálculo de métricas de red y matrices estocásticas normalizadas.
 * `core/visualization.py`: Generación de diagramas de red y heatmaps de adyacencia.
 * `output/<lang>/`: Directorios separados por lengua que almacenan las matrices en formato CSV y las figuras visuales.
+

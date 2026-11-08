@@ -109,3 +109,4 @@ DATASET LIMPIO CONSOLIDADO
 1. **`data/benchmark/`**: Textos canónicos de los 12 pasajes en inglés y en cada una de las lenguas nativas, junto con conteo de palabras y longitudes.
 2. **`data/by.sub.l1.csv`**: Tabla consolidada a nivel de sujeto con métricas agregadas por L1 (duraciones medias, tasas de regresión, aciertos de comprensión).
 3. **`data/ANALISIS_CALIDAD_*.md`**: Auditorías sistemáticas de completitud, rangos numéricos y consistencia entre waves.
+

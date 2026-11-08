@@ -125,3 +125,4 @@ Para trascender las etiquetas fijas por idioma, se implementó un **clustering $
   * Tarjetas de resumen de perfiles: [`figure_3c_reader_archetypes_profiles.png`](file:///Users/diegusho/.gemini/antigravity/brain/ec06e3df-cf43-4425-80fa-757a037d6177/figure_3c_reader_archetypes_profiles.png)
   * Tabla metodológica de campos de clustering: [`campos_clustering_input.png`](file:///Users/diegusho/.gemini/antigravity/brain/ec06e3df-cf43-4425-80fa-757a037d6177/campos_clustering_input.png)
   * Tabla numérica por arquetipo: [`tabla_resumen_arquetipos.png`](file:///Users/diegusho/.gemini/antigravity/brain/ec06e3df-cf43-4425-80fa-757a037d6177/tabla_resumen_arquetipos.png)
+
